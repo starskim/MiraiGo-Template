@@ -14,13 +14,11 @@ dmitri.shuralyov.com/gpu/mtl v0.0.0-20190408044501-666a987793e9/go.mod h1:H6x//7
 github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
-github.com/Mrs4s/MiraiGo v0.0.0-20210217093128-52b80fdf142a h1:8+K6MAOFSJfPAF08+90lgfLjrj0hmM5MWNrFOtj5lIE=
-github.com/Mrs4s/MiraiGo v0.0.0-20210217093128-52b80fdf142a/go.mod h1:yhqA0NyKxUf7I/0HR/1OMchveFggX8wde04gqdGrNfU=
 github.com/Mrs4s/MiraiGo v0.0.0-20210304103008-effa2b84fe7a h1:7mc+NYNEQsHsodQR4XxODpHhV5/u3Hxb4W2OWsPiM6o=
 github.com/Mrs4s/MiraiGo v0.0.0-20210304103008-effa2b84fe7a/go.mod h1:drSlh4LlYtjOMJxirScUCSnylBKi1NIRxUz7TKdSsNs=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
-github.com/Sora233/MiraiGo-Template v0.0.0-20210304031353-cc947bb74315 h1:Eb/Pju8dJB3nD/UA24zND22NDFCEZhu/pR00/N2fnuk=
-github.com/Sora233/MiraiGo-Template v0.0.0-20210304031353-cc947bb74315/go.mod h1:pDKf4w/Bex8HYUH7F1HP6jxE6DGz0mENrIMzuXJxxyM=
+github.com/Sora233/MiraiGo-Template v0.0.0-20210305053737-fced683d2ba9 h1:YEV4XHl3e3evkmvD2uwsoOLzAr84ZK/fAxU92Kz3W34=
+github.com/Sora233/MiraiGo-Template v0.0.0-20210305053737-fced683d2ba9/go.mod h1:hh7DeInZMkj19gGSK1X+4RQHsgBufXIZge9wYNAbdfE=
 github.com/a8m/syncmap v0.0.0-20200818084611-4bbbd178de97/go.mod h1:f3iF7/3t9i9hsYF8DPgT0XeIVyNzevhMCKf2445Q6pE=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
 github.com/alecthomas/units v0.0.0-20151022065526-2efee857e7cf/go.mod h1:ybxpYRFXyAe+OPACYpWeL0wqObRcbAqCMya13uyzqw0=
