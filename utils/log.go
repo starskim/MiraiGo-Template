@@ -37,11 +37,5 @@ func WriteLogToPath(p string) {
 		logrus.WithError(err).Error("unable to write logs")
 		return
 	}
-	logrus.AddHook(lfshook.NewHook(
-		lfshook.WriterMap{
-			logrus.InfoLevel:  writer,
-			logrus.ErrorLevel: writer,
-			logrus.FatalLevel: writer,
-		}, &logrus.JSONFormatter{},
-	))
+	logrus.AddHook(lfshook.NewHook(writer, &logrus.JSONFormatter{}))
 }
