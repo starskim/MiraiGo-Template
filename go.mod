@@ -12,4 +12,8 @@ require (
 	github.com/yinghau76/go-ascii-art v0.0.0-20190517192627-e7f465a30189
 )
 
-replace github.com/Logiase/MiraiGo-Template v0.0.0-20210228150851-29092d4d5486 => github.com/Sora233/MiraiGo-Template v0.0.0-20210305053737-fced683d2ba9
+replace github.com/Logiase/MiraiGo-Template => ./
+replace github.com/Logiase/MiraiGo-Template/bot => ./bot
+replace github.com/Logiase/MiraiGo-Template/modules => ./modules
+replace github.com/Logiase/MiraiGo-Template/config => ./config
+replace github.com/Logiase/MiraiGo-Template/utils => ./utils
