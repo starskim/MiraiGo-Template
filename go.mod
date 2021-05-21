@@ -6,6 +6,7 @@ require (
 	github.com/Logiase/MiraiGo-Template v0.0.0-20210228150851-29092d4d5486
 	github.com/Mrs4s/MiraiGo v0.0.0-20210611062429-4f967b0a6264
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
+	github.com/lestrrat-go/strftime v1.0.4 // indirect
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
 	github.com/sirupsen/logrus v1.8.0
 	github.com/spf13/viper v1.7.1
