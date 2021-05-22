@@ -40,9 +40,13 @@ func Init() {
 		),
 		false,
 	}
-	err := client.SystemDeviceInfo.ReadJson(utils.ReadFile("./device.json"))
+	deviceJson := utils.ReadFile("./device.json")
+	if deviceJson == nil {
+		logger.Fatal("can not read ./device.json")
+	}
+	err := client.SystemDeviceInfo.ReadJson(deviceJson)
 	if err != nil {
-		logger.WithError(err).Panic("device.json error")
+		logger.WithError(err).Fatal("read device.json error")
 	}
 }
 

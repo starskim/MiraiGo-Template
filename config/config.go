@@ -24,6 +24,6 @@ func Init() {
 
 	err := GlobalConfig.ReadInConfig()
 	if err != nil {
-		logrus.WithField("config", "GlobalConfig").WithError(err).Panicf("unable to read global config")
+		logrus.WithField("config", "GlobalConfig").WithError(err).Fatal("unable to read global config")
 	}
 }
