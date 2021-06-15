@@ -4,7 +4,7 @@ go 1.15
 
 require (
 	github.com/Logiase/MiraiGo-Template v0.0.0-20210228150851-29092d4d5486
-	github.com/Mrs4s/MiraiGo v0.0.0-20210304103008-effa2b84fe7a
+	github.com/Mrs4s/MiraiGo v0.0.0-20210611062429-4f967b0a6264
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/rifflock/lfshook v0.0.0-20180920164130-b9218ef580f5
 	github.com/sirupsen/logrus v1.8.0
@@ -13,7 +13,11 @@ require (
 )
 
 replace github.com/Logiase/MiraiGo-Template => ./
+
 replace github.com/Logiase/MiraiGo-Template/bot => ./bot
+
 replace github.com/Logiase/MiraiGo-Template/modules => ./modules
+
 replace github.com/Logiase/MiraiGo-Template/config => ./config
+
 replace github.com/Logiase/MiraiGo-Template/utils => ./utils
