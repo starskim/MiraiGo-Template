@@ -40,6 +40,7 @@ func Init() {
 		),
 		false,
 	}
+	Instance.AllowSlider = true
 	deviceJson := utils.ReadFile("./device.json")
 	if deviceJson == nil {
 		logger.Fatal("can not read ./device.json")
@@ -79,7 +80,6 @@ func GenRandomDevice() {
 
 // Login 登录
 func Login() {
-	Instance.AllowSlider = true
 	resp, err := Instance.Login()
 	console := bufio.NewReader(os.Stdin)
 
