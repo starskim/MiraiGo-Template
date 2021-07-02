@@ -136,11 +136,10 @@ func qrcodeLogin() error {
 func Login() {
 	resp, err := Instance.Login()
 	if err != nil {
-		logger.Fatal("login failed: %v", err)
+		logger.Fatalf("login failed: %v", err)
 	}
 
 	err = login(resp)
-	logger.Fatal("login failed: %v", err)
 
 	if err != nil {
 		logger.Fatal("login failed: %v", err)
