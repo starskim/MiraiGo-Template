@@ -14,8 +14,8 @@ require (
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
 	github.com/spf13/viper v1.7.1
 	github.com/tuotoo/qrcode v0.0.0-20190222102259-ac9c44189bf2
-	github.com/willf/bitset v0.0.0-00010101000000-000000000000 // indirect
 	github.com/yinghau76/go-ascii-art v0.0.0-20190517192627-e7f465a30189
+	github.com/willf/bitset v1.1.11 // indirect
 )
 
 replace github.com/Logiase/MiraiGo-Template => ./
@@ -27,5 +27,3 @@ replace github.com/Logiase/MiraiGo-Template/modules => ./modules
 replace github.com/Logiase/MiraiGo-Template/config => ./config
 
 replace github.com/Logiase/MiraiGo-Template/utils => ./utils
-
-replace github.com/willf/bitset => github.com/bits-and-blooms/bitset v1.2.0
