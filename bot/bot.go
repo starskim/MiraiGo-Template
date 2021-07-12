@@ -37,13 +37,11 @@ var logger = logrus.WithField("bot", "internal")
 // 使用 config.GlobalConfig 初始化账号
 // 使用 ./device.json 初始化设备信息
 func Init() {
-	Instance = &Bot{
-		client.NewClient(
-			config.GlobalConfig.GetInt64("bot.account"),
-			config.GlobalConfig.GetString("bot.password"),
-		),
-		false,
-	}
+	account := config.GlobalConfig.GetInt64("bot.account")
+	password := config.GlobalConfig.GetString("bot.password")
+
+	InitBot(account, password)
+
 	Instance.AllowSlider = true
 	deviceJson := utils.ReadFile("./device.json")
 	if deviceJson == nil {
@@ -57,9 +55,16 @@ func Init() {
 
 // InitBot 使用 account password 进行初始化账号
 func InitBot(account int64, password string) {
-	Instance = &Bot{
-		client.NewClient(account, password),
-		false,
+	if account == 0 {
+		Instance = &Bot{
+			client.NewClientEmpty(),
+			false,
+		}
+	} else {
+		Instance = &Bot{
+			client.NewClient(account, password),
+			false,
+		}
 	}
 }
 
@@ -134,17 +139,26 @@ func qrcodeLogin() error {
 
 // Login 登录
 func Login() {
-	resp, err := Instance.Login()
-	if err != nil {
-		logger.Fatalf("login failed: %v", err)
-	}
-
-	err = login(resp)
-
-	if err != nil {
-		logger.Fatal("login failed: %v", err)
+	if Instance.Uin == 0 {
+		err := qrcodeLogin()
+		if err != nil {
+			logger.Fatal("login failed: %v", err)
+		} else {
+			logger.Infof("bot login: %s", Instance.Nickname)
+		}
 	} else {
-		logger.Infof("bot login: %s", Instance.Nickname)
+		resp, err := Instance.Login()
+		if err != nil {
+			logger.Fatalf("login failed: %v", err)
+		}
+
+		err = login(resp)
+
+		if err != nil {
+			logger.Fatal("login failed: %v", err)
+		} else {
+			logger.Infof("bot login: %s", Instance.Nickname)
+		}
 	}
 }
 
