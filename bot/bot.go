@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/google/martian/log"
 	"github.com/tuotoo/qrcode"
 	asc2art "github.com/yinghau76/go-ascii-art"
 	"image"
@@ -98,7 +97,7 @@ func qrcodeLogin() error {
 	}
 	_ = ioutil.WriteFile("qrcode.png", rsp.ImageData, 0o644)
 	defer func() { _ = os.Remove("qrcode.png") }()
-	log.Infof("请使用手机QQ扫描二维码 (qrcode.png) : ")
+	logger.Infof("请使用手机QQ扫描二维码 (qrcode.png) : ")
 	time.Sleep(time.Second)
 	qrcodeTerminal.New().Get(fi.Content).Print()
 	s, err := Instance.QueryQRCodeStatus(rsp.Sig)
@@ -118,13 +117,13 @@ func qrcodeLogin() error {
 		prevState = s.State
 		switch s.State {
 		case client.QRCodeCanceled:
-			fmt.Println("扫码被用户取消.")
+			logger.Info("扫码被用户取消.")
 			os.Exit(1)
 		case client.QRCodeTimeout:
-			fmt.Println("二维码过期")
+			logger.Info("二维码过期")
 			os.Exit(1)
 		case client.QRCodeWaitingForConfirm:
-			log.Infof("扫码成功, 请在手机端确认登录.")
+			logger.Infof("扫码成功, 请在手机端确认登录.")
 		case client.QRCodeConfirmed:
 			res, err := Instance.QRCodeLogin(s.LoginInfo)
 			if err != nil {
@@ -140,6 +139,7 @@ func qrcodeLogin() error {
 // Login 登录
 func Login() {
 	if Instance.Uin == 0 {
+		logger.Info("未指定账号密码，请扫码登陆")
 		err := qrcodeLogin()
 		if err != nil {
 			logger.Fatal("login failed: %v", err)
@@ -147,6 +147,7 @@ func Login() {
 			logger.Infof("bot login: %s", Instance.Nickname)
 		}
 	} else {
+		logger.Info("使用帐号密码登陆")
 		resp, err := Instance.Login()
 		if err != nil {
 			logger.Fatalf("login failed: %v", err)
