@@ -3,6 +3,7 @@ package bot
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"github.com/Mrs4s/MiraiGo/binary"
 	"github.com/tuotoo/qrcode"
@@ -63,7 +64,8 @@ func (bot *Bot) ReLogin(e *client.ClientDisconnectedEvent) error {
 	}
 	logger.Warnf("快速重连失败: %v", err)
 	if bot.isQRCode {
-		logger.Fatalf("快速重连失败, 扫码登录无法恢复会话.")
+		logger.Errorf("快速重连失败, 扫码登录无法恢复会话.")
+		return errors.New("qrcode login relogin failed")
 	}
 	logger.Warnf("快速重连失败, 尝试普通登录. 这可能是因为其他端强行T下线导致的.")
 	time.Sleep(time.Second)
