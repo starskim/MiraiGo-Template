@@ -192,24 +192,26 @@ func qrcodeLogin() error {
 func Login() {
 	if ok, _ := utils.FileExist(sessionToken); ok {
 		token, err := Instance.getToken()
-		if err != nil || Instance.Uin == 0 {
+		if err != nil {
 			goto NormalLogin
 		}
-		r := binary.NewReader(token)
-		sessionUin := r.ReadInt64()
-		if sessionUin != Instance.Uin {
-			logger.Warnf("QQ号(%v)与会话缓存内的QQ号(%v)不符，将清除会话缓存", Instance.Uin, sessionUin)
-			Instance.clearToken()
-		} else {
-			if err = Instance.TokenLogin(token); err != nil {
+		if Instance.Uin != 0 {
+			r := binary.NewReader(token)
+			sessionUin := r.ReadInt64()
+			if sessionUin != Instance.Uin {
+				logger.Warnf("QQ号(%v)与会话缓存内的QQ号(%v)不符，将清除会话缓存", Instance.Uin, sessionUin)
 				Instance.clearToken()
-				logger.Warnf("恢复会话失败: %v , 尝试使用正常流程登录.", err)
-				time.Sleep(time.Second)
-			} else {
-				Instance.saveToken()
-				logger.Debug("恢复会话成功")
-				return
+				goto NormalLogin
 			}
+		}
+		if err = Instance.TokenLogin(token); err != nil {
+			Instance.clearToken()
+			logger.Warnf("恢复会话失败: %v , 尝试使用正常流程登录.", err)
+			time.Sleep(time.Second)
+		} else {
+			Instance.saveToken()
+			logger.Debug("恢复会话成功")
+			return
 		}
 	}
 
