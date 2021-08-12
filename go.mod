@@ -5,7 +5,7 @@ go 1.15
 require (
 	github.com/Baozisoftware/qrcode-terminal-go v0.0.0-20170407111555-c0650d8dff0f
 	github.com/Logiase/MiraiGo-Template v0.0.0-20210228150851-29092d4d5486
-	github.com/Mrs4s/MiraiGo v0.0.0-20210611062429-4f967b0a6264
+	github.com/Mrs4s/MiraiGo v0.0.0-20210811093938-8a3d449b7d7d
 	github.com/google/martian v2.1.0+incompatible
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/lestrrat-go/strftime v1.0.4 // indirect
