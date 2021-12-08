@@ -210,7 +210,7 @@ func Login() {
 			Instance.clearToken()
 			Instance.Disconnect()
 			Instance.Release()
-			Instance.QQClient = client.NewClientEmpty()
+			Init()
 			logger.Warnf("恢复会话失败: %v , 尝试使用正常流程登录.", err)
 			time.Sleep(time.Second)
 		} else {
