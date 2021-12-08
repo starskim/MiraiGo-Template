@@ -225,7 +225,7 @@ NormalLogin:
 		logger.Info("未指定账号密码，请扫码登陆")
 		err := qrcodeLogin()
 		if err != nil {
-			logger.Fatal("login failed: %v", err)
+			logger.Fatalf("login failed: %v", err)
 		} else {
 			logger.Infof("bot login: %s", Instance.Nickname)
 		}
@@ -239,7 +239,7 @@ NormalLogin:
 		err = login(resp)
 
 		if err != nil {
-			logger.Fatal("login failed: %v", err)
+			logger.Fatalf("login failed: %v", err)
 		} else {
 			logger.Infof("bot login: %s", Instance.Nickname)
 		}
