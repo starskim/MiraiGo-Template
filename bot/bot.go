@@ -49,7 +49,7 @@ func (bot *Bot) getToken() ([]byte, error) {
 func (bot *Bot) ReLogin(e *client.ClientDisconnectedEvent) error {
 	reloginLock.Lock()
 	defer reloginLock.Unlock()
-	if bot.Online {
+	if bot.Online.Load() {
 		return nil
 	}
 	logger.Warnf("Bot已离线: %v", e.Message)
