@@ -80,11 +80,6 @@ var logger = logrus.WithField("bot", "internal")
 // 使用 config.GlobalConfig 初始化账号
 // 使用 ./device.json 初始化设备信息
 func Init() {
-	account := config.GlobalConfig.GetInt64("bot.account")
-	password := config.GlobalConfig.GetString("bot.password")
-
-	initBot(account, password)
-
 	deviceJson := utils.ReadFile("./device.json")
 	if deviceJson == nil {
 		logger.Fatal("无法读取 ./device.json")
@@ -93,6 +88,11 @@ func Init() {
 	if err != nil {
 		logger.Fatalf("读取device.json发生错误 - %v", err)
 	}
+
+	account := config.GlobalConfig.GetInt64("bot.account")
+	password := config.GlobalConfig.GetString("bot.password")
+
+	initBot(account, password)
 }
 
 // initBot 使用 account password 进行初始化账号
@@ -107,6 +107,20 @@ func initBot(account int64, password string) {
 			QQClient: client.NewClient(account, password),
 		}
 	}
+	Instance.OnLog(func(c *client.QQClient, e *client.LogEvent) {
+		switch e.Type {
+		case "INFO":
+			logger.Info("Protocol -> " + e.Message)
+		case "ERROR":
+			logger.Error("Protocol -> " + e.Message)
+		case "DEBUG":
+			logger.Debug("Protocol -> " + e.Message)
+		case "DUMP":
+			dumpFile := fmt.Sprintf("%v.dump", time.Now().Unix())
+			logger.Errorf("出现错误 %v. 详细信息已转储至文件 %v 请连同日志提交给开发者处理", e.Message, dumpFile)
+			_ = os.WriteFile(dumpFile, e.Dump, 0o644)
+		}
+	})
 }
 
 // UseDevice 使用 device 进行初始化设备信息
@@ -176,7 +190,6 @@ NormalLogin:
 		}
 	}
 	Instance.saveToken()
-	Instance.AllowSlider = true
 }
 
 // RefreshList 刷新联系人
