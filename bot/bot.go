@@ -107,20 +107,6 @@ func initBot(account int64, password string) {
 			QQClient: client.NewClient(account, password),
 		}
 	}
-	Instance.OnLog(func(c *client.QQClient, e *client.LogEvent) {
-		switch e.Type {
-		case "INFO":
-			logger.Info("Protocol -> " + e.Message)
-		case "ERROR":
-			logger.Error("Protocol -> " + e.Message)
-		case "DEBUG":
-			logger.Debug("Protocol -> " + e.Message)
-		case "DUMP":
-			dumpFile := fmt.Sprintf("%v.dump", time.Now().Unix())
-			logger.Errorf("出现错误 %v. 详细信息已转储至文件 %v 请连同日志提交给开发者处理", e.Message, dumpFile)
-			_ = os.WriteFile(dumpFile, e.Dump, 0o644)
-		}
-	})
 }
 
 // UseDevice 使用 device 进行初始化设备信息
