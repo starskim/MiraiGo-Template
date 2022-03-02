@@ -10,18 +10,16 @@ type Config struct {
 }
 
 // GlobalConfig 默认全局配置
-var GlobalConfig *Config
+var GlobalConfig = &Config{
+	viper.New(),
+}
 
 // Init 使用 ./application.yaml 初始化全局配置
 func Init() {
-	GlobalConfig = &Config{
-		viper.New(),
-	}
 	GlobalConfig.SetConfigName("application")
 	GlobalConfig.SetConfigType("yaml")
 	GlobalConfig.AddConfigPath(".")
 	GlobalConfig.AddConfigPath("./config")
-	GlobalConfig.WatchConfig()
 
 	err := GlobalConfig.ReadInConfig()
 	if err != nil {
