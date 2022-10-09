@@ -3,7 +3,6 @@ package bot
 import (
 	"fmt"
 	"github.com/Mrs4s/MiraiGo/binary"
-	"io/ioutil"
 	"os"
 	"sync"
 	"time"
@@ -27,14 +26,14 @@ type Bot struct {
 }
 
 func (bot *Bot) saveToken() {
-	_ = ioutil.WriteFile(sessionToken, bot.GenToken(), 0o677)
+	_ = os.WriteFile(sessionToken, bot.GenToken(), 0o677)
 }
 func (bot *Bot) clearToken() {
 	os.Remove(sessionToken)
 }
 
 func (bot *Bot) getToken() ([]byte, error) {
-	return ioutil.ReadFile(sessionToken)
+	return os.ReadFile(sessionToken)
 }
 
 // ReLogin 掉线时可以尝试使用会话缓存重新登陆，只允许在OnDisconnected中调用
@@ -122,7 +121,7 @@ func GenRandomDevice() {
 		logger.Warn("device.json exists, will not write device to file")
 		return
 	}
-	err := ioutil.WriteFile("device.json", client.SystemDeviceInfo.ToJson(), os.FileMode(0755))
+	err := os.WriteFile("device.json", client.SystemDeviceInfo.ToJson(), os.FileMode(0755))
 	if err != nil {
 		logger.WithError(err).Errorf("unable to write device.json")
 	}
