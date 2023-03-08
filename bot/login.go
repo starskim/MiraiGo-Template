@@ -202,9 +202,7 @@ func loginResponseProcessor(res *client.LoginResponse) error {
 			os.Exit(0)
 		case client.OtherLoginError, client.UnknownLoginError, client.TooManySMSRequestError:
 			msg := res.ErrorMessage
-			if strings.Contains(msg, "版本") {
-				msg = "密码错误或账号被冻结"
-			} else if strings.Contains(msg, "冻结") {
+			if strings.Contains(msg, "冻结") {
 				logger.Fatalf("账号被冻结")
 			}
 			logger.Warnf("登录失败: %v", msg)
