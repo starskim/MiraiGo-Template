@@ -72,7 +72,7 @@ func (bot *Bot) ReLogin(e *client.ClientDisconnectedEvent) error {
 
 // Instance Bot 实例
 var Instance *Bot
-
+var deviceInfo = new(client.DeviceInfo)
 var logger = logrus.WithField("bot", "internal")
 
 // Init 快速初始化
@@ -83,7 +83,7 @@ func Init() {
 	if deviceJson == nil {
 		logger.Fatal("无法读取 ./device.json")
 	}
-	err := client.SystemDeviceInfo.ReadJson(deviceJson)
+	err := deviceInfo.ReadJson(deviceJson)
 	if err != nil {
 		logger.Fatalf("读取device.json发生错误 - %v", err)
 	}
@@ -106,22 +106,17 @@ func initBot(account int64, password string) {
 			QQClient: client.NewClient(account, password),
 		}
 	}
-}
-
-// UseDevice 使用 device 进行初始化设备信息
-func UseDevice(device []byte) error {
-	return client.SystemDeviceInfo.ReadJson(device)
+	Instance.UseDevice(deviceInfo)
 }
 
 // GenRandomDevice 生成随机设备信息
 func GenRandomDevice() {
-	client.GenRandomDevice()
 	b, _ := utils.FileExist("./device.json")
 	if b {
 		logger.Warn("device.json exists, will not write device to file")
 		return
 	}
-	err := os.WriteFile("device.json", client.SystemDeviceInfo.ToJson(), os.FileMode(0755))
+	err := os.WriteFile("device.json", client.GenRandomDevice().ToJson(), os.FileMode(0755))
 	if err != nil {
 		logger.WithError(err).Errorf("unable to write device.json")
 	}
@@ -130,7 +125,7 @@ func GenRandomDevice() {
 // Login 登录
 func Login() {
 	logger.Info("开始尝试登录并同步消息...")
-	logger.Infof("使用协议: %s", client.SystemDeviceInfo.Protocol)
+	logger.Infof("使用协议: %s", deviceInfo.Protocol)
 
 	if ok, _ := utils.FileExist(sessionToken); ok {
 		token, err := Instance.getToken()

@@ -1,9 +1,9 @@
 module github.com/Sora233/MiraiGo-Template
 
-go 1.19
+go 1.20
 
 require (
-	github.com/Mrs4s/MiraiGo v0.0.0-20220925082653-d3b8c5f700af
+	github.com/Mrs4s/MiraiGo v0.0.0-20230307172929-fee6c23736c1
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/mattn/go-colorable v0.1.12
 	github.com/pkg/errors v0.9.1
@@ -14,7 +14,7 @@ require (
 )
 
 require (
-	github.com/RomiChan/protobuf v0.0.0-20220624030127-3310cba9dbc0 // indirect
+	github.com/RomiChan/protobuf v0.1.1-0.20230204044148-2ed269a2e54d // indirect
 	github.com/RomiChan/syncx v0.0.0-20220404072119-d7ea0ae15a4c // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/fumiama/imgsz v0.0.2 // indirect
