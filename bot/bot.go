@@ -3,7 +3,10 @@ package bot
 import (
 	"fmt"
 	"github.com/Mrs4s/MiraiGo/binary"
+	"io"
 	"io/ioutil"
+	"log"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -12,6 +15,7 @@ import (
 	"github.com/Sora233/MiraiGo-Template/config"
 	"github.com/Sora233/MiraiGo-Template/utils"
 	"github.com/sirupsen/logrus"
+	"gopkg.ilharper.com/x/isatty"
 )
 
 var reloginLock = new(sync.Mutex)
@@ -27,14 +31,14 @@ type Bot struct {
 }
 
 func (bot *Bot) saveToken() {
-	_ = ioutil.WriteFile(sessionToken, bot.GenToken(), 0o677)
+	_ = os.WriteFile(sessionToken, bot.GenToken(), 0o677)
 }
 func (bot *Bot) clearToken() {
 	os.Remove(sessionToken)
 }
 
 func (bot *Bot) getToken() ([]byte, error) {
-	return ioutil.ReadFile(sessionToken)
+	return os.ReadFile(sessionToken)
 }
 
 // ReLogin 掉线时可以尝试使用会话缓存重新登陆，只允许在OnDisconnected中调用
@@ -84,7 +88,7 @@ func Init() {
 	if deviceJson == nil {
 		logger.Fatal("无法读取 ./device.json")
 	}
-	err := client.SystemDeviceInfo.ReadJson(deviceJson)
+	err := deviceInfo.ReadJson(deviceJson)
 	if err != nil {
 		logger.Fatalf("读取device.json发生错误 - %v", err)
 	}
@@ -107,11 +111,14 @@ func initBot(account int64, password string) {
 			QQClient: client.NewClient(account, password),
 		}
 	}
+	Instance.UseDevice(deviceInfo)
 }
+
+var deviceInfo = client.GenRandomDevice()
 
 // UseDevice 使用 device 进行初始化设备信息
 func UseDevice(device []byte) error {
-	return client.SystemDeviceInfo.ReadJson(device)
+	return deviceInfo.ReadJson(device)
 }
 
 // GenRandomDevice 生成随机设备信息
@@ -122,57 +129,119 @@ func GenRandomDevice() {
 		logger.Warn("device.json exists, will not write device to file")
 		return
 	}
-	err := ioutil.WriteFile("device.json", client.SystemDeviceInfo.ToJson(), os.FileMode(0755))
+	err := ioutil.WriteFile("device.json", deviceInfo.ToJson(), os.FileMode(0755))
 	if err != nil {
 		logger.WithError(err).Errorf("unable to write device.json")
 	}
 }
 
+var remoteVersions = map[int]string{
+	1: "https://raw.githubusercontent.com/RomiChan/protocol-versions/master/android_phone.json",
+	6: "https://raw.githubusercontent.com/RomiChan/protocol-versions/master/android_pad.json",
+}
+
+func getRemoteLatestProtocolVersion(protocolType int) ([]byte, error) {
+	url, ok := remoteVersions[protocolType]
+	if !ok {
+		return nil, fmt.Errorf("remote version unavailable")
+	}
+	resp, err := http.Get(url)
+	if err != nil {
+		resp, err = http.Get("https://ghproxy.com/" + url)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return io.ReadAll(resp.Body)
+}
+
+func readIfTTY(de string) (str string) {
+	if isatty.Isatty(os.Stdin.Fd()) {
+		return readLine()
+	}
+	logger.Warnf("未检测到输入终端，自动选择%s.", de)
+	return de
+}
+
 // Login 登录
 func Login() {
 	logger.Info("开始尝试登录并同步消息...")
-	logger.Infof("使用协议: %s", client.SystemDeviceInfo.Protocol)
+	logger.Infof("使用协议: %s", deviceInfo.Protocol)
+	Instance.UseDevice(deviceInfo)
 
+	if Instance.isQRCode && Instance.Device().Protocol != 2 {
+		logger.Warn("当前协议不支持二维码登录, 请配置账号密码登录.")
+		os.Exit(0)
+	}
+
+	// 加载本地版本信息, 一般是在上次登录时保存的
+	versionFile := fmt.Sprintf("versions_%d.json", int(Instance.Device().Protocol))
+	if ok, _ := utils.FileExist(versionFile); ok {
+		b, err := os.ReadFile(versionFile)
+		if err == nil {
+			_ = Instance.Device().Protocol.Version().UpdateFromJson(b)
+		}
+		logger.Infof("从文件 %s 读取协议版本 %v.", versionFile, Instance.Device().Protocol.Version())
+	}
+
+	var isTokenLogin bool
 	if ok, _ := utils.FileExist(sessionToken); ok {
 		token, err := Instance.getToken()
-		if err != nil {
-			goto NormalLogin
-		}
-		if Instance.Uin != 0 {
-			r := binary.NewReader(token)
-			sessionUin := r.ReadInt64()
-			if sessionUin != Instance.Uin {
-				logger.Warnf("QQ号(%v)与会话缓存内的QQ号(%v)不符，将清除会话缓存", Instance.Uin, sessionUin)
-				Instance.clearToken()
-				goto NormalLogin
+		if err == nil {
+			if Instance.Uin != 0 {
+				r := binary.NewReader(token)
+				cu := r.ReadInt64()
+				if cu != Instance.Uin {
+					logger.Warnf("警告: 配置文件内的QQ号 (%v) 与缓存内的QQ号 (%v) 不相同", Instance.Uin, cu)
+					logger.Warnf("1. 使用会话缓存继续.")
+					logger.Warnf("2. 删除会话缓存并重启.")
+					logger.Warnf("请选择:")
+					text := readIfTTY("1")
+					if text == "2" {
+						_ = os.Remove("session.token")
+						logger.Infof("缓存已删除.")
+						os.Exit(0)
+					}
+				}
 			}
-		}
-		if err = Instance.TokenLogin(token); err != nil {
-			Instance.clearToken()
-			logger.Warnf("恢复会话失败: %v , 尝试使用正常流程登录.", err)
-			time.Sleep(time.Second)
-			Instance.Disconnect()
-			Instance.Release()
-			Init()
-		} else {
-			Instance.saveToken()
-			logger.Debug("恢复会话成功")
-			return
+			if err = Instance.TokenLogin(token); err != nil {
+				_ = os.Remove("session.token")
+				logger.Warnf("恢复会话失败: %v , 尝试使用正常流程登录.", err)
+				time.Sleep(time.Second)
+				Instance.Disconnect()
+				Instance.Release()
+				Init()
+				Instance.UseDevice(deviceInfo)
+			} else {
+				isTokenLogin = true
+			}
 		}
 	}
 
-NormalLogin:
-	if Instance.Uin == 0 {
-		logger.Info("未指定账号密码，请扫码登陆")
-		err := qrcodeLogin()
-		if err != nil {
-			logger.Fatalf("login failed: %v", err)
+	if !isTokenLogin {
+		logger.Infof("正在检查协议更新...")
+		oldVersionName := Instance.Device().Protocol.Version().String()
+		remoteVersion, err := getRemoteLatestProtocolVersion(int(Instance.Device().Protocol.Version().Protocol))
+		if err == nil {
+			if err = Instance.Device().Protocol.Version().UpdateFromJson(remoteVersion); err == nil {
+				if Instance.Device().Protocol.Version().String() != oldVersionName {
+					logger.Infof("已自动更新协议版本: %s -> %s", oldVersionName, Instance.Device().Protocol.Version().String())
+				} else {
+					logger.Infof("协议已经是最新版本")
+				}
+				_ = os.WriteFile(versionFile, remoteVersion, 0o644)
+			}
+		} else if err.Error() != "remote version unavailable" {
+			logger.Warnf("检查协议更新失败: %v", err)
 		}
-	} else {
-		logger.Info("使用帐号密码登陆")
-		err := commonLogin()
-		if err != nil {
-			logger.Fatalf("login failed: %v", err)
+		if !Instance.isQRCode {
+			if err := commonLogin(); err != nil {
+				log.Fatalf("登录时发生致命错误: %v", err)
+			}
+		} else {
+			if err := qrcodeLogin(); err != nil {
+				log.Fatalf("登录时发生致命错误: %v", err)
+			}
 		}
 	}
 	Instance.saveToken()

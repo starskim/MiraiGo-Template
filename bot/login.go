@@ -3,17 +3,62 @@ package bot
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
+	"fmt"
+	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
+	"github.com/Mrs4s/MiraiGo/client"
+	"github.com/Mrs4s/MiraiGo/utils"
+	"github.com/Mrs4s/MiraiGo/wrapper"
+	"github.com/gocq/qrcode"
+	"github.com/guonaihong/gout"
+	"github.com/pkg/errors"
+	"github.com/tidwall/gjson"
 	"os"
 	"strings"
 	"time"
-
-	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
-	"github.com/Mrs4s/MiraiGo/client"
-	"github.com/gocq/qrcode"
-	"github.com/pkg/errors"
 )
 
 var console = bufio.NewReader(os.Stdin)
+
+func init() {
+	wrapper.DandelionEnergy = energy
+}
+
+func energy(uin uint64, id string, salt []byte) ([]byte, error) {
+	// temporary solution
+	signServer := "https://captcha.go-cqhttp.org/sdk/dandelion/energy"
+
+	var response []byte
+	err := gout.POST(signServer).
+		SetHeader(gout.H{"Content-Type": "application/x-www-form-urlencoded"}).
+		SetBody([]byte(fmt.Sprintf("uin=%v&id=%s&salt=%s", uin, id, hex.EncodeToString(salt)))).
+		BindBody(&response).Do()
+
+	if err != nil {
+		logger.Errorf("获取T544时出现问题: %v", err)
+		return nil, err
+	}
+	sign, err := hex.DecodeString(gjson.GetBytes(response, "result").String())
+	if err != nil {
+		logger.Errorf("获取T544时出现问题: %v", err)
+		return nil, err
+	}
+	return sign, nil
+}
+
+func fetchCaptcha(id string) string {
+	var b []byte
+	err := gout.GET("https://captcha.go-cqhttp.org/captcha/ticket?id=" + id).BindBody(&b).Do()
+	//g, err := download.Request{URL: "https://captcha.go-cqhttp.org/captcha/ticket?id=" + id}.JSON()
+	if err != nil {
+		logger.Debugf("获取 Ticket 时出现错误: %v", err)
+		return ""
+	}
+	if gt := gjson.GetBytes(b, "ticket"); gt.Exists() {
+		return gt.String()
+	}
+	return ""
+}
 
 func readLine() (str string) {
 	str, _ = console.ReadString('\n')
@@ -100,6 +145,34 @@ func qrcodeLogin() error {
 	}
 }
 
+func getTicket(u string) string {
+	logger.Warnf("请选择提交滑块ticket方式:")
+	logger.Warnf("1. 自动提交")
+	logger.Warnf("2. 手动抓取提交")
+	logger.Warn("请输入(1 - 2)：")
+	text := readLine()
+	id := utils.RandomString(8)
+	auto := !strings.Contains(text, "2")
+	if auto {
+		u = strings.ReplaceAll(u, "https://ssl.captcha.qq.com/template/wireless_mqq_captcha.html?", fmt.Sprintf("https://captcha.go-cqhttp.org/captcha?id=%v&", id))
+	}
+	logger.Warnf("请前往该地址验证 -> %v ", u)
+	if !auto {
+		logger.Warn("请输入ticket： (Enter 提交)")
+		return readLine()
+	}
+
+	for count := 120; count > 0; count-- {
+		str := fetchCaptcha(id)
+		if str != "" {
+			return str
+		}
+		time.Sleep(time.Second)
+	}
+	logger.Warnf("验证超时")
+	return ""
+}
+
 func loginResponseProcessor(res *client.LoginResponse) error {
 	var err error
 	for {
@@ -112,11 +185,15 @@ func loginResponseProcessor(res *client.LoginResponse) error {
 		var text string
 		switch res.Error {
 		case client.SliderNeededError:
-			logger.Warnf("登录需要滑条验证码, 请使用手机QQ扫描二维码以继续登录.")
-			Instance.Disconnect()
-			Instance.Release()
-			initBot(0, "")
-			return qrcodeLogin()
+			logger.Warnf("登录需要滑条验证码, 请验证后重试.")
+			ticket := getTicket(res.VerifyUrl)
+			if ticket == "" {
+				logger.Infof("按 Enter 继续....")
+				readLine()
+				os.Exit(0)
+			}
+			res, err = Instance.SubmitTicket(ticket)
+			continue
 		case client.NeedCaptcha:
 			logger.Warnf("登录需要验证码.")
 			_ = os.WriteFile("captcha.jpg", res.CaptchaImage, 0o644)
@@ -140,8 +217,8 @@ func loginResponseProcessor(res *client.LoginResponse) error {
 			logger.Warnf("账号已开启设备锁，请选择验证方式:")
 			logger.Warnf("1. 向手机 %v 发送短信验证码", res.SMSPhone)
 			logger.Warnf("2. 使用手机QQ扫码验证.")
-			logger.Warn("请输入(1 - 2) (将在10秒后自动选择2)：")
-			text = readLineTimeout(time.Second*10, "2")
+			logger.Warn("请输入(1 - 2)：")
+			text = readIfTTY("2")
 			if strings.Contains(text, "1") {
 				if !Instance.RequestSMS() {
 					logger.Warnf("发送验证码失败，可能是请求过于频繁.")
@@ -160,15 +237,12 @@ func loginResponseProcessor(res *client.LoginResponse) error {
 			os.Exit(0)
 		case client.OtherLoginError, client.UnknownLoginError, client.TooManySMSRequestError:
 			msg := res.ErrorMessage
-			if strings.Contains(msg, "版本") {
-				msg = "密码错误或账号被冻结"
+			logger.Warnf("登录失败: %v Code: %v", msg, res.Code)
+			if res.Code == 235 {
+				logger.Warnf("请删除 device.json 后重试.")
 			}
-			if strings.Contains(msg, "冻结") {
-				logger.Fatalf("账号被冻结")
-			}
-			logger.Warnf("登录失败: %v", msg)
-			logger.Infof("按 Enter 或等待 5s 后继续....")
-			readLineTimeout(time.Second*5, "")
+			logger.Infof("按 Enter 继续....")
+			readLine()
 			os.Exit(0)
 		}
 	}
