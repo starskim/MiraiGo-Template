@@ -5,14 +5,17 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	qrcodeTerminal "github.com/Baozisoftware/qrcode-terminal-go"
 	"github.com/Mrs4s/MiraiGo/client"
 	"github.com/Mrs4s/MiraiGo/utils"
 	"github.com/Mrs4s/MiraiGo/wrapper"
-	"github.com/gocq/qrcode"
+	"github.com/Sora233/MiraiGo-Template/internal/encryption"
 	"github.com/guonaihong/gout"
+	"github.com/mattn/go-colorable"
 	"github.com/pkg/errors"
 	"github.com/tidwall/gjson"
+	"image"
+	"image/png"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -24,25 +27,29 @@ func init() {
 	wrapper.DandelionEnergy = energy
 }
 
-func energy(uin uint64, id string, salt []byte) ([]byte, error) {
-	// temporary solution
+func energy(uin uint64, id string, appVersion string, salt []byte) ([]byte, error) {
+	if localSigner, ok := encryption.T544Signer[appVersion]; ok {
+		logger.Debugf("use local T544Signer v%s", appVersion)
+		result := localSigner(time.Now().UnixMicro(), salt)
+		logger.Debugf("t544 sign result: %x", result)
+		return result, nil
+	}
+	logger.Debugf("fallback to remote T544Signer v%s", appVersion)
 	signServer := "https://captcha.go-cqhttp.org/sdk/dandelion/energy"
-
 	var response []byte
-	err := gout.POST(signServer).
-		SetHeader(gout.H{"Content-Type": "application/x-www-form-urlencoded"}).
-		SetBody([]byte(fmt.Sprintf("uin=%v&id=%s&salt=%s", uin, id, hex.EncodeToString(salt)))).
+	err := gout.POST(signServer).SetBody(bytes.NewReader([]byte(fmt.Sprintf("uin=%v&id=%s&salt=%s&version=%s", uin, id, hex.EncodeToString(salt), appVersion)))).
+		SetHeader(map[string]string{"Content-Type": "application/x-www-form-urlencoded"}).
 		BindBody(&response).Do()
-
 	if err != nil {
 		logger.Errorf("获取T544时出现问题: %v", err)
 		return nil, err
 	}
 	sign, err := hex.DecodeString(gjson.GetBytes(response, "result").String())
-	if err != nil {
+	if err != nil || len(sign) == 0 {
 		logger.Errorf("获取T544时出现问题: %v", err)
 		return nil, err
 	}
+	logger.Debugf("t544 sign result: %x", sign)
 	return sign, nil
 }
 
@@ -93,12 +100,36 @@ func commonLogin() error {
 	return loginResponseProcessor(res)
 }
 
-func qrcodeLogin() error {
-	rsp, err := Instance.FetchQRCode()
+func printQRCode(imgData []byte) {
+	const (
+		black = "\033[48;5;0m  \033[0m"
+		white = "\033[48;5;7m  \033[0m"
+	)
+	img, err := png.Decode(bytes.NewReader(imgData))
 	if err != nil {
-		return err
+		log.Panic(err)
 	}
-	fi, err := qrcode.Decode(bytes.NewReader(rsp.ImageData))
+	data := img.(*image.Gray).Pix
+	bound := img.Bounds().Max.X
+	buf := make([]byte, 0, (bound*4+1)*(bound))
+	i := 0
+	for y := 0; y < bound; y++ {
+		i = y * bound
+		for x := 0; x < bound; x++ {
+			if data[i] != 255 {
+				buf = append(buf, white...)
+			} else {
+				buf = append(buf, black...)
+			}
+			i++
+		}
+		buf = append(buf, '\n')
+	}
+	_, _ = colorable.NewColorableStdout().Write(buf)
+}
+
+func qrcodeLogin() error {
+	rsp, err := Instance.FetchQRCodeCustomSize(1, 2, 1)
 	if err != nil {
 		return err
 	}
@@ -110,7 +141,7 @@ func qrcodeLogin() error {
 		logger.Infof("请使用手机QQ扫描二维码 (qrcode.png) : ")
 	}
 	time.Sleep(time.Second)
-	qrcodeTerminal.New2(qrcodeTerminal.ConsoleColors.BrightBlack, qrcodeTerminal.ConsoleColors.BrightWhite, qrcodeTerminal.QRCodeRecoveryLevels.Low).Get(fi.Content).Print()
+	printQRCode(rsp.ImageData)
 	s, err := Instance.QueryQRCodeStatus(rsp.Sig)
 	if err != nil {
 		return err
@@ -238,8 +269,13 @@ func loginResponseProcessor(res *client.LoginResponse) error {
 		case client.OtherLoginError, client.UnknownLoginError, client.TooManySMSRequestError:
 			msg := res.ErrorMessage
 			logger.Warnf("登录失败: %v Code: %v", msg, res.Code)
-			if res.Code == 235 {
-				logger.Warnf("请删除 device.json 后重试.")
+			switch res.Code {
+			case 235:
+				logger.Warnf("设备信息被封禁, 请删除 device.json 后重试.")
+			case 237:
+				logger.Warnf("登录过于频繁, 请在手机QQ登录并根据提示完成认证后等一段时间重试")
+			case 45: // 在提供 t544 后还是出现45错误是需要强行升级到最新客户端或被限制非常用设备
+				logger.Warnf("你的账号涉嫌违规被限制在非常用设备登录, 请在手机QQ登录并根据提示完成认证")
 			}
 			logger.Infof("按 Enter 继续....")
 			readLine()
