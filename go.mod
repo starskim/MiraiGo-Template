@@ -3,7 +3,7 @@ module github.com/Sora233/MiraiGo-Template
 go 1.20
 
 require (
-	github.com/Mrs4s/MiraiGo v0.0.0-20230401072048-f8d9841755b5
+	github.com/Mrs4s/MiraiGo v0.0.0-20230627090859-19e3d172596e
 	github.com/fumiama/go-base16384 v1.7.0
 	github.com/guonaihong/gout v0.3.7
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible

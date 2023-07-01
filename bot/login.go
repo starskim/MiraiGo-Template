@@ -7,15 +7,16 @@ import (
 	"fmt"
 	"github.com/Mrs4s/MiraiGo/client"
 	"github.com/Mrs4s/MiraiGo/utils"
-	"github.com/Mrs4s/MiraiGo/wrapper"
-	"github.com/Sora233/MiraiGo-Template/internal/encryption"
+	"github.com/Sora233/MiraiGo-Template/config"
 	"github.com/guonaihong/gout"
 	"github.com/mattn/go-colorable"
 	"github.com/pkg/errors"
 	"github.com/tidwall/gjson"
 	"image"
 	"image/png"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -23,34 +24,57 @@ import (
 
 var console = bufio.NewReader(os.Stdin)
 
-func init() {
-	wrapper.DandelionEnergy = energy
+func energy(uin uint64, id string, appVersion string, salt []byte) ([]byte, error) {
+	signServer := config.GlobalConfig.GetString("sign-server")
+	if !strings.HasSuffix(signServer, "/") {
+		signServer += "/"
+	}
+	resp, err := http.Get(signServer + "custom_energy" + fmt.Sprintf("?data=%v&salt=%v", id, hex.EncodeToString(salt)))
+	if err != nil {
+		logger.Warnf("获取T544 sign时出现错误: %v server: %v", err, signServer)
+		return nil, err
+	}
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Warnf("获取T544 sign时出现错误: %v server: %v", err, signServer)
+		return nil, err
+	}
+	data, err = hex.DecodeString(gjson.GetBytes(data, "data").String())
+	if err != nil {
+		logger.Warnf("获取T544 sign时出现错误: %v", err)
+		return nil, err
+	}
+	if len(data) == 0 {
+		logger.Warnf("获取T544 sign时出现错误: %v", "data is empty")
+		return nil, errors.New("data is empty")
+	}
+	return data, nil
 }
 
-func energy(uin uint64, id string, appVersion string, salt []byte) ([]byte, error) {
-	if localSigner, ok := encryption.T544Signer[appVersion]; ok {
-		logger.Debugf("use local T544Signer v%s", appVersion)
-		result := localSigner(time.Now().UnixMicro(), salt)
-		logger.Debugf("t544 sign result: %x", result)
-		return result, nil
+func sign(seq uint64, uin string, cmd string, qua string, buff []byte) (sign []byte, extra []byte, token []byte, err error) {
+	signServer := config.GlobalConfig.GetString("sign-server")
+	if !strings.HasSuffix(signServer, "/") {
+		signServer += "/"
 	}
-	logger.Debugf("fallback to remote T544Signer v%s", appVersion)
-	signServer := "https://captcha.go-cqhttp.org/sdk/dandelion/energy"
-	var response []byte
-	err := gout.POST(signServer).SetBody(bytes.NewReader([]byte(fmt.Sprintf("uin=%v&id=%s&salt=%s&version=%s", uin, id, hex.EncodeToString(salt), appVersion)))).
-		SetHeader(map[string]string{"Content-Type": "application/x-www-form-urlencoded"}).
-		BindBody(&response).Do()
+	req, err := http.NewRequest(http.MethodPost, signServer+"sign", bytes.NewReader([]byte(fmt.Sprintf("uin=%v&qua=%s&cmd=%s&seq=%v&buffer=%v", uin, qua, cmd, seq, hex.EncodeToString(buff)))))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Body = io.NopCloser(bytes.NewReader([]byte(fmt.Sprintf("uin=%v&qua=%s&cmd=%s&seq=%v&buffer=%v", uin, qua, cmd, seq, hex.EncodeToString(buff)))))
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		logger.Errorf("获取T544时出现问题: %v", err)
-		return nil, err
+		logger.Warnf("获取sso sign时出现错误: %v server: %v", err, signServer)
+		return nil, nil, nil, err
 	}
-	sign, err := hex.DecodeString(gjson.GetBytes(response, "result").String())
-	if err != nil || len(sign) == 0 {
-		logger.Errorf("获取T544时出现问题: %v", err)
-		return nil, err
+	defer resp.Body.Close()
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Warnf("获取sso sign时出现错误: %v server: %v", err, signServer)
+		return nil, nil, nil, err
 	}
-	logger.Debugf("t544 sign result: %x", sign)
-	return sign, nil
+	sign, _ = hex.DecodeString(gjson.GetBytes(data, "data.sign").String())
+	extra, _ = hex.DecodeString(gjson.GetBytes(data, "data.extra").String())
+	token, _ = hex.DecodeString(gjson.GetBytes(data, "data.token").String())
+	return sign, extra, token, nil
 }
 
 func fetchCaptcha(id string) string {
@@ -274,8 +298,8 @@ func loginResponseProcessor(res *client.LoginResponse) error {
 				logger.Warnf("设备信息被封禁, 请删除 device.json 后重试.")
 			case 237:
 				logger.Warnf("登录过于频繁, 请在手机QQ登录并根据提示完成认证后等一段时间重试")
-			case 45: // 在提供 t544 后还是出现45错误是需要强行升级到最新客户端或被限制非常用设备
-				logger.Warnf("你的账号涉嫌违规被限制在非常用设备登录, 请在手机QQ登录并根据提示完成认证")
+			case 45:
+				logger.Warnf("你的账号被限制登录, 请配置 SignServer 后重试")
 			}
 			logger.Infof("按 Enter 继续....")
 			readLine()

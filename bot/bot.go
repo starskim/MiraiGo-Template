@@ -3,6 +3,7 @@ package bot
 import (
 	"fmt"
 	"github.com/Mrs4s/MiraiGo/binary"
+	"github.com/Mrs4s/MiraiGo/wrapper"
 	"io"
 	"io/ioutil"
 	"log"
@@ -97,6 +98,14 @@ func Init() {
 	password := config.GlobalConfig.GetString("bot.password")
 
 	initBot(account, password)
+
+	signServer := config.GlobalConfig.GetString("sign-server")
+	if signServer == "" {
+		fmt.Println("警告: 未配置签名服务器, 这可能会导致登录 45 错误码或发送消息被风控")
+	} else {
+		wrapper.DandelionEnergy = energy
+		wrapper.FekitGetSign = sign
+	}
 }
 
 // initBot 使用 account password 进行初始化账号
