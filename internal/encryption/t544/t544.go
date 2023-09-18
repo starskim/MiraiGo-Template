@@ -6,7 +6,7 @@ import (
 	"crypto/md5"
 	"crypto/rc4"
 	"encoding/binary"
-	"github.com/Sora233/MiraiGo-Template/internal/encryption"
+	"github.com/starskim/MiraiGo-Template/internal/encryption"
 	"math/rand"
 )
 
