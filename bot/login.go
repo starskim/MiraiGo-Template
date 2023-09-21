@@ -7,14 +7,13 @@ import (
 	"fmt"
 	"github.com/Mrs4s/MiraiGo/client"
 	"github.com/Mrs4s/MiraiGo/utils"
-	"github.com/starskim/MiraiGo-Template/config"
-	"github.com/guonaihong/gout"
 	"github.com/mattn/go-colorable"
 	"github.com/pkg/errors"
+	"github.com/starskim/MiraiGo-Template/config"
+	"github.com/starskim/MiraiGo-Template/internal/download"
 	"github.com/tidwall/gjson"
 	"image"
 	"image/png"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -30,25 +29,25 @@ var console = bufio.NewReader(os.Stdin)
 
 func energy(uin uint64, id string, _ string, salt []byte) ([]byte, error) {
 	signServer := config.GlobalConfig.GetString("sign.server")
+	SignServerTimeout := config.GlobalConfig.GetInt("sign.server-timeout")
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
-	query := fmt.Sprintf("?data=%v&salt=%v&uin=%v&android_id=%v&guid=%v",
-		id, hex.EncodeToString(salt), uin, utils.B2S(deviceInfo.AndroidId), hex.EncodeToString(deviceInfo.Guid))
-	if config.GlobalConfig.GetBool("sign.is-below-110") {
-		query = fmt.Sprintf("?data=%v&salt=%v", id, hex.EncodeToString(salt))
-	}
-	resp, err := http.Get(signServer + "custom_energy" + query)
+	headers := make(map[string]string)
 	signServerBearer := config.GlobalConfig.GetString("sign.server-bearer")
-	if signServerBearer != "" {
-		resp.Header.Set("Authorization", "Bearer "+signServerBearer)
+	if signServerBearer != "-" && signServerBearer != "" {
+		headers["Authorization"] = "Bearer " + signServerBearer
 	}
-	if err != nil {
-		logger.Warnf("获取T544 sign时出现错误: %v server: %v", err, signServer)
-		return nil, err
+	req := download.Request{
+		Method: http.MethodGet,
+		Header: headers,
+		URL: signServer + "custom_energy" + fmt.Sprintf("?data=%v&salt=%v&uin=%v&android_id=%v&guid=%v",
+			id, hex.EncodeToString(salt), uin, utils.B2S(deviceInfo.AndroidId), hex.EncodeToString(deviceInfo.Guid)),
+	}.WithTimeout(time.Duration(SignServerTimeout) * time.Second)
+	if config.GlobalConfig.GetBool("sign.is-below-110") {
+		req.URL = signServer + "custom_energy" + fmt.Sprintf("?data=%v&salt=%v", id, hex.EncodeToString(salt))
 	}
-	defer resp.Body.Close()
-	response, err := io.ReadAll(resp.Body)
+	response, err := req.Bytes()
 	if err != nil {
 		logger.Warnf("获取T544 sign时出现错误: %v server: %v", err, signServer)
 		return nil, err
@@ -68,14 +67,18 @@ func energy(uin uint64, id string, _ string, salt []byte) ([]byte, error) {
 // signSubmit 提交的操作类型
 func signSubmit(uin string, cmd string, callbackID int64, buffer []byte, t string) {
 	signServer := config.GlobalConfig.GetString("sign.server")
+	SignServerTimeout := config.GlobalConfig.GetInt("sign.server-timeout")
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
 	buffStr := hex.EncodeToString(buffer)
 	logger.Infof("submit %v: uin=%v, cmd=%v, callbackID=%v, buffer-end=%v", t, uin, cmd, callbackID,
 		buffStr[len(buffStr)-10:])
-	_, err := http.Get(signServer + "submit" + fmt.Sprintf("?uin=%v&cmd=%v&callback_id=%v&buffer=%v",
-		uin, cmd, callbackID, buffStr))
+	_, err := download.Request{
+		Method: http.MethodGet,
+		URL: signServer + "submit" + fmt.Sprintf("?uin=%v&cmd=%v&callback_id=%v&buffer=%v",
+			uin, cmd, callbackID, buffStr),
+	}.WithTimeout(time.Duration(SignServerTimeout) * time.Second).Bytes()
 	if err != nil {
 		logger.Warnf("提交 callback 时出现错误: %v server: %v", err, signServer)
 	}
@@ -97,24 +100,22 @@ func signCallback(uin string, results []gjson.Result, t string) {
 
 func signRequset(seq uint64, uin string, cmd string, qua string, buff []byte) (sign []byte, extra []byte, token []byte, err error) {
 	signServer := config.GlobalConfig.GetString("sign.server")
+	SignServerTimeout := config.GlobalConfig.GetInt("sign.server-timeout")
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
-	req, err := http.NewRequest(http.MethodPost, signServer+"sign", bytes.NewReader([]byte(fmt.Sprintf("uin=%v&qua=%s&cmd=%s&seq=%v&buffer=%v&android_id=%v&guid=%v",
-		uin, qua, cmd, seq, hex.EncodeToString(buff), utils.B2S(deviceInfo.AndroidId), hex.EncodeToString(deviceInfo.Guid)))))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	headers := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
 	signServerBearer := config.GlobalConfig.GetString("sign.server-bearer")
-	if signServerBearer != "" {
-		req.Header.Set("Authorization", "Bearer "+signServerBearer)
+	if signServerBearer != "-" && signServerBearer != "" {
+		headers["Authorization"] = "Bearer " + signServerBearer
 	}
-	req.Body = io.NopCloser(bytes.NewReader([]byte(fmt.Sprintf("uin=%v&qua=%s&cmd=%s&seq=%v&buffer=%v&android_id=%v&guid=%v",
-		uin, qua, cmd, seq, hex.EncodeToString(buff), utils.B2S(deviceInfo.AndroidId), hex.EncodeToString(deviceInfo.Guid)))))
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	defer resp.Body.Close()
-	response, err := io.ReadAll(resp.Body)
+	response, err := download.Request{
+		Method: http.MethodPost,
+		URL:    signServer + "sign",
+		Header: headers,
+		Body: bytes.NewReader([]byte(fmt.Sprintf("uin=%v&qua=%s&cmd=%s&seq=%v&buffer=%v&android_id=%v&guid=%v",
+			uin, qua, cmd, seq, hex.EncodeToString(buff), utils.B2S(deviceInfo.AndroidId), hex.EncodeToString(deviceInfo.Guid)))),
+	}.WithTimeout(time.Duration(SignServerTimeout) * time.Second).Bytes()
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -135,17 +136,15 @@ func signRegister(uin int64, androidID, guid []byte, qimei36, key string) {
 		return
 	}
 	signServer := config.GlobalConfig.GetString("sign.server")
+	SignServerTimeout := config.GlobalConfig.GetInt("sign.server-timeout")
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
-	req, err := http.Get(signServer + "register" + fmt.Sprintf("?uin=%v&android_id=%v&guid=%v&qimei36=%v&key=%s",
-		uin, utils.B2S(androidID), hex.EncodeToString(guid), qimei36, key))
-	if err != nil {
-		logger.Warnf("注册QQ实例时出现错误: %v server: %v", err, signServer)
-		return
-	}
-	defer req.Body.Close()
-	resp, err := io.ReadAll(req.Body)
+	resp, err := download.Request{
+		Method: http.MethodGet,
+		URL: signServer + "register" + fmt.Sprintf("?uin=%v&android_id=%v&guid=%v&qimei36=%v&key=%s",
+			uin, utils.B2S(androidID), hex.EncodeToString(guid), qimei36, key),
+	}.WithTimeout(time.Duration(SignServerTimeout) * time.Second).Bytes()
 	if err != nil {
 		logger.Warnf("注册QQ实例时出现错误: %v server: %v", err, signServer)
 		return
@@ -160,16 +159,15 @@ func signRegister(uin int64, androidID, guid []byte, qimei36, key string) {
 
 func signRefreshToken(uin string) error {
 	signServer := config.GlobalConfig.GetString("sign.server")
+	SignServerTimeout := config.GlobalConfig.GetInt("sign.server-timeout")
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
 	logger.Info("正在刷新 token")
-	req, err := http.Get(signServer + "request_token" + fmt.Sprintf("?uin=%v", uin))
-	if err != nil {
-		return err
-	}
-	defer req.Body.Close()
-	resp, err := io.ReadAll(req.Body)
+	resp, err := download.Request{
+		Method: http.MethodGet,
+		URL:    signServer + "request_token" + fmt.Sprintf("?uin=%v", uin),
+	}.WithTimeout(time.Duration(SignServerTimeout) * time.Second).Bytes()
 	if err != nil {
 		return err
 	}
@@ -226,6 +224,7 @@ func sign(seq uint64, uin string, cmd string, qua string, buff []byte) (sign []b
 
 func signServerDestroy(uin string) error {
 	signServer := config.GlobalConfig.GetString("sign.server")
+	SignServerTimeout := config.GlobalConfig.GetInt("sign.server-timeout")
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
@@ -236,13 +235,10 @@ func signServerDestroy(uin string) error {
 	if "v"+signVersion > "v1.1.6" {
 		return errors.Errorf("当前签名服务器版本 %v 低于 1.1.6，无法使用 destroy 接口", signVersion)
 	}
-
-	req, err := http.Get(signServer + "destroy" + fmt.Sprintf("?uin=%v&key=%v", uin, config.GlobalConfig.GetString("sign.key")))
-	if err != nil {
-		return errors.Wrapf(err, "destroy 实例出现错误, server: %v", signServer)
-	}
-	defer req.Body.Close()
-	resp, err := io.ReadAll(req.Body)
+	resp, err := download.Request{
+		Method: http.MethodGet,
+		URL:    signServer + "destroy" + fmt.Sprintf("?uin=%v&key=%v", uin, config.GlobalConfig.GetString("sign.key")),
+	}.WithTimeout(time.Duration(SignServerTimeout) * time.Second).Bytes()
 	if err != nil || gjson.GetBytes(resp, "code").Int() != 0 {
 		return errors.Wrapf(err, "destroy 实例出现错误, server: %v", signServer)
 	}
@@ -251,12 +247,11 @@ func signServerDestroy(uin string) error {
 
 func signVersion() (version string, err error) {
 	signServer := config.GlobalConfig.GetString("sign.server")
-	req, err := http.Get(signServer)
-	if err != nil {
-		return "", err
-	}
-	defer req.Body.Close()
-	resp, err := io.ReadAll(req.Body)
+	SignServerTimeout := config.GlobalConfig.GetInt("sign.server-timeout")
+	resp, err := download.Request{
+		Method: http.MethodGet,
+		URL:    signServer,
+	}.WithTimeout(time.Duration(SignServerTimeout) * time.Second).Bytes()
 	if err != nil {
 		return "", err
 	}
@@ -316,15 +311,13 @@ func signWaitServer() bool {
 }
 
 func fetchCaptcha(id string) string {
-	var b []byte
-	err := gout.GET("https://captcha.go-cqhttp.org/captcha/ticket?id=" + id).BindBody(&b).Do()
-	//g, err := download.Request{URL: "https://captcha.go-cqhttp.org/captcha/ticket?id=" + id}.JSON()
+	g, err := download.Request{URL: "https://captcha.go-cqhttp.org/captcha/ticket?id=" + id}.JSON()
 	if err != nil {
 		logger.Debugf("获取 Ticket 时出现错误: %v", err)
 		return ""
 	}
-	if gt := gjson.GetBytes(b, "ticket"); gt.Exists() {
-		return gt.String()
+	if g.Get("ticket").Exists() {
+		return g.Get("ticket").String()
 	}
 	return ""
 }

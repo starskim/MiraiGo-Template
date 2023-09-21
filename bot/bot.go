@@ -4,18 +4,17 @@ import (
 	"fmt"
 	"github.com/Mrs4s/MiraiGo/binary"
 	"github.com/Mrs4s/MiraiGo/wrapper"
-	"io"
+	"github.com/starskim/MiraiGo-Template/internal/download"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/Mrs4s/MiraiGo/client"
+	"github.com/sirupsen/logrus"
 	"github.com/starskim/MiraiGo-Template/config"
 	"github.com/starskim/MiraiGo-Template/utils"
-	"github.com/sirupsen/logrus"
 	"gopkg.ilharper.com/x/isatty"
 )
 
@@ -175,14 +174,11 @@ func getRemoteLatestProtocolVersion(protocolType int) ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("remote version unavailable")
 	}
-	resp, err := http.Get(url)
+	response, err := download.Request{URL: url}.Bytes()
 	if err != nil {
-		resp, err = http.Get("https://ghproxy.com/" + url)
+		return download.Request{URL: "https://ghproxy.com/" + url}.Bytes()
 	}
-	if err != nil {
-		return nil, err
-	}
-	return io.ReadAll(resp.Body)
+	return response, nil
 }
 
 func readIfTTY(de string) (str string) {
