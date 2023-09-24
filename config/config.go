@@ -34,7 +34,7 @@ type SignServer struct {
 type Config struct {
 	Sign  *SignConfig `mapstructure:"sign"`
 	Bot   *BotConfig  `mapstructure:"bot"`
-	Proxy string      `mapstructure:"proxy"`
+	Proxy string      `mapstructure:"proxys"`
 }
 
 type ViperConfig struct {
@@ -58,7 +58,10 @@ var (
 
 func Base() {
 	config := &Config{}
-	GlobalConfig.Unmarshal(&config)
+	err := GlobalConfig.Unmarshal(&config)
+	if err != nil {
+		logrus.Fatal("配置文件不合法!", err)
+	}
 	{
 		Bot = config.Bot
 		Sign = config.Sign

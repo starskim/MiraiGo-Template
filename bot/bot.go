@@ -6,7 +6,7 @@ import (
 	"github.com/Mrs4s/MiraiGo/wrapper"
 	"github.com/starskim/MiraiGo-Template/config"
 	"github.com/starskim/MiraiGo-Template/internal/download"
-	"io/ioutil"
+	"github.com/tidwall/gjson"
 	"log"
 	"os"
 	"sync"
@@ -149,15 +149,15 @@ func GenRandomDevice() {
 		logger.Warn("device.json exists, will not write device to file")
 		return
 	}
-	err := ioutil.WriteFile("device.json", deviceInfo.ToJson(), os.FileMode(0755))
+	err := os.WriteFile("device.json", deviceInfo.ToJson(), os.FileMode(0755))
 	if err != nil {
 		logger.WithError(err).Errorf("unable to write device.json")
 	}
 }
 
 var remoteVersions = map[int]string{
-	1: "https://raw.githubusercontent.com/starskim/protocol-versions/master/android_phone.json",
-	6: "https://raw.githubusercontent.com/starskim/protocol-versions/master/android_pad.json",
+	1: "https://raw.githubusercontent.com/RomiChan/protocol-versions/master/android_phone.json",
+	6: "https://raw.githubusercontent.com/RomiChan/protocol-versions/master/android_pad.json",
 }
 
 func getRemoteLatestProtocolVersion(protocolType int) ([]byte, error) {
@@ -237,16 +237,15 @@ func Login() {
 
 	if !isTokenLogin {
 		logger.Infof("正在检查协议更新...")
-		oldVersionName := Instance.Device().Protocol.Version().String()
+		oldVersionName := Instance.Device().Protocol.Version().SortVersionName
 		remoteVersion, err := getRemoteLatestProtocolVersion(int(Instance.Device().Protocol.Version().Protocol))
 		if err == nil {
-			if err = Instance.Device().Protocol.Version().UpdateFromJson(remoteVersion); err == nil {
-				if Instance.Device().Protocol.Version().String() != oldVersionName {
-					logger.Infof("已自动更新协议版本: %s -> %s", oldVersionName, Instance.Device().Protocol.Version().String())
-				} else {
-					logger.Infof("协议已经是最新版本")
-				}
+			remoteVersionName := gjson.GetBytes(remoteVersion, "sort_version_name").String()
+			if remoteVersionName > oldVersionName {
 				_ = os.WriteFile(versionFile, remoteVersion, 0o644)
+				logger.Infof("已自动更新协议版本: %s -> %s", oldVersionName, remoteVersionName)
+			} else {
+				logger.Infof("协议已经是最新版本")
 			}
 		} else if err.Error() != "remote version unavailable" {
 			logger.Warnf("检查协议更新失败: %v", err)
@@ -266,18 +265,18 @@ func Login() {
 
 // RefreshList 刷新联系人
 func RefreshList() {
-	logger.Info("start reload friends list")
+	logger.Info("开始加载好友列表...")
 	err := Instance.ReloadFriendList()
 	if err != nil {
-		logger.WithError(err).Error("unable to load friends list")
+		logger.WithError(err).Error("无法加载好友列表...")
 	}
-	logger.Infof("load %d friends", len(Instance.FriendList))
-	logger.Info("start reload groups list")
+	logger.Infof("共加载 %v 个好友.", len(Instance.FriendList))
+	logger.Info("开始加载群列表...")
 	err = Instance.ReloadGroupList()
 	if err != nil {
-		logger.WithError(err).Error("unable to load groups list")
+		logger.WithError(err).Error("无法加载群列表...")
 	}
-	logger.Infof("load %d groups", len(Instance.GroupList))
+	logger.Infof("共加载 %v 个群.", len(Instance.GroupList))
 }
 
 // StartService 启动服务
