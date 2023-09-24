@@ -16,21 +16,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/RomiChan/syncx"
 	"github.com/pkg/errors"
 	"github.com/tidwall/gjson"
 )
 
-var client = newcli(time.Second * 15)
-
-var Proxy = config.GlobalConfig.GetString("Proxy")
+var client = newClient(time.Second * 15)
+var clients syncx.Map[time.Duration, *http.Client]
 
 var clienth2 = &http.Client{
 	Transport: &http.Transport{
 		Proxy: func(request *http.Request) (*url.URL, error) {
-			if Proxy == "" {
+			if config.Proxy == "" {
 				return http.ProxyFromEnvironment(request)
 			}
-			return url.Parse(Proxy)
+			return url.Parse(config.Proxy)
 		},
 		ForceAttemptHTTP2:   true,
 		MaxIdleConnsPerHost: 999,
@@ -38,14 +38,14 @@ var clienth2 = &http.Client{
 	Timeout: time.Second * 15,
 }
 
-func newcli(t time.Duration) *http.Client {
+func newClient(t time.Duration) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			Proxy: func(request *http.Request) (*url.URL, error) {
-				if Proxy == "" {
+				if config.Proxy == "" {
 					return http.ProxyFromEnvironment(request)
 				}
-				return url.Parse(Proxy)
+				return url.Parse(config.Proxy)
 			},
 			// Disable http2
 			TLSNextProto:        map[string]func(authority string, c *tls.Conn) http.RoundTripper{},
@@ -63,7 +63,13 @@ const UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 
 // WithTimeout get a download instance with timeout t
 func (r Request) WithTimeout(t time.Duration) *Request {
-	r.custcli = newcli(t)
+	if c, ok := clients.Load(t); ok {
+		r.custcli = c
+	} else {
+		c := newClient(t)
+		clients.Store(t, c)
+		r.custcli = c
+	}
 	return &r
 }
 
@@ -138,6 +144,7 @@ func (r Request) Bytes() ([]byte, error) {
 		return nil, err
 	}
 	defer rd.Close()
+	defer r.client().CloseIdleConnections()
 	return io.ReadAll(rd)
 }
 
@@ -148,6 +155,7 @@ func (r Request) JSON() (gjson.Result, error) {
 		return gjson.Result{}, err
 	}
 	defer rd.Close()
+	defer r.client().CloseIdleConnections()
 
 	var sb strings.Builder
 	_, err = io.Copy(&sb, rd)
@@ -175,6 +183,7 @@ func (r Request) WriteToFile(path string) error {
 		return err
 	}
 	defer rd.Close()
+	defer r.client().CloseIdleConnections()
 	return writeToFile(rd, path)
 }
 
@@ -184,6 +193,7 @@ func (r Request) WriteToFileMultiThreading(path string, thread int) error {
 		return r.WriteToFile(path)
 	}
 
+	defer r.client().CloseIdleConnections()
 	limit := r.Limit
 	type BlockMetaData struct {
 		BeginOffset    int64
