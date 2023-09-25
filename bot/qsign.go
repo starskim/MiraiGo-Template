@@ -19,17 +19,17 @@ import (
 )
 
 func energy(uin uint64, id string, _ string, salt []byte) ([]byte, error) {
-	signServer := config.GlobalConfig.GetString("sign.server")
+	signServer := config.SignServer
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
 	query := fmt.Sprintf("?data=%v&salt=%v&uin=%v&android_id=%v&guid=%v",
 		id, hex.EncodeToString(salt), uin, utils.B2S(deviceInfo.AndroidId), hex.EncodeToString(deviceInfo.Guid))
-	if config.GlobalConfig.GetBool("sign.is-below-110") {
+	if config.IsBelow110 {
 		query = fmt.Sprintf("?data=%v&salt=%v", id, hex.EncodeToString(salt))
 	}
 	resp, err := http.Get(signServer + "custom_energy" + query)
-	signServerBearer := config.GlobalConfig.GetString("sign.server-bearer")
+	signServerBearer := config.SignServerBearer
 	if signServerBearer != "" {
 		resp.Header.Set("Authorization", "Bearer "+signServerBearer)
 	}
@@ -57,7 +57,7 @@ func energy(uin uint64, id string, _ string, salt []byte) ([]byte, error) {
 
 // signSubmit 提交的操作类型
 func signSubmit(uin string, cmd string, callbackID int64, buffer []byte, t string) {
-	signServer := config.GlobalConfig.GetString("sign.server")
+	signServer := config.SignServer
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
@@ -86,14 +86,14 @@ func signCallback(uin string, results []gjson.Result, t string) {
 }
 
 func signRequset(seq uint64, uin string, cmd string, qua string, buff []byte) (sign []byte, extra []byte, token []byte, err error) {
-	signServer := config.GlobalConfig.GetString("sign.server")
+	signServer := config.SignServer
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
 	req, err := http.NewRequest(http.MethodPost, signServer+"sign", bytes.NewReader([]byte(fmt.Sprintf("uin=%v&qua=%s&cmd=%s&seq=%v&buffer=%v&android_id=%v&guid=%v",
 		uin, qua, cmd, seq, hex.EncodeToString(buff), utils.B2S(deviceInfo.AndroidId), hex.EncodeToString(deviceInfo.Guid)))))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	signServerBearer := config.GlobalConfig.GetString("sign.server-bearer")
+	signServerBearer := config.SignServerBearer
 	if signServerBearer != "" {
 		req.Header.Set("Authorization", "Bearer "+signServerBearer)
 	}
@@ -111,7 +111,7 @@ func signRequset(seq uint64, uin string, cmd string, qua string, buff []byte) (s
 	sign, _ = hex.DecodeString(gjson.GetBytes(response, "data.sign").String())
 	extra, _ = hex.DecodeString(gjson.GetBytes(response, "data.extra").String())
 	token, _ = hex.DecodeString(gjson.GetBytes(response, "data.token").String())
-	if !config.GlobalConfig.GetBool("sign.is-below-110") {
+	if !config.IsBelow110 {
 		go signCallback(uin, gjson.GetBytes(response, "data.requestCallback").Array(), "sign")
 	}
 	return sign, extra, token, nil
@@ -120,11 +120,11 @@ func signRequset(seq uint64, uin string, cmd string, qua string, buff []byte) (s
 var registerLock sync.Mutex
 
 func signRegister(uin int64, androidID, guid []byte, qimei36, key string) {
-	if config.GlobalConfig.GetBool("sign.is-below-110") {
+	if config.IsBelow110 {
 		logger.Warn("签名服务器版本低于1.1.0, 跳过实例注册")
 		return
 	}
-	signServer := config.GlobalConfig.GetString("sign.server")
+	signServer := config.SignServer
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
@@ -149,7 +149,7 @@ func signRegister(uin int64, androidID, guid []byte, qimei36, key string) {
 }
 
 func signRefreshToken(uin string) error {
-	signServer := config.GlobalConfig.GetString("sign.server")
+	signServer := config.SignServer
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
@@ -178,13 +178,13 @@ func sign(seq uint64, uin string, cmd string, qua string, buff []byte) (sign []b
 	for {
 		sign, extra, token, err = signRequset(seq, uin, cmd, qua, buff)
 		if err != nil {
-			logger.Warnf("获取sso sign时出现错误: %v server: %v", err, config.GlobalConfig.GetString("sign.server"))
+			logger.Warnf("获取sso sign时出现错误: %v server: %v", err, config.SignServer)
 		}
 		if i > 0 {
 			break
 		}
 		i++
-		if (!config.GlobalConfig.GetBool("sign.is-below-110")) && config.GlobalConfig.GetBool("sign.auto-register") && err == nil && len(sign) == 0 {
+		if (!config.IsBelow110) && config.Sign.AutoRegister && err == nil && len(sign) == 0 {
 			if registerLock.TryLock() { // 避免并发时多处同时销毁并重新注册
 				logger.Warn("获取签名为空，实例可能丢失，正在尝试重新注册")
 				defer registerLock.Unlock()
@@ -193,16 +193,16 @@ func sign(seq uint64, uin string, cmd string, qua string, buff []byte) (sign []b
 					logger.Warnln(err)
 					return nil, nil, nil, err
 				}
-				signRegister(config.GlobalConfig.GetInt64("bot.account"), deviceInfo.AndroidId, deviceInfo.Guid, deviceInfo.QImei36, config.GlobalConfig.GetString("sign.key"))
+				signRegister(config.Bot.Account, deviceInfo.AndroidId, deviceInfo.Guid, deviceInfo.QImei36, config.Key)
 			}
 			continue
 		}
-		if (!config.GlobalConfig.GetBool("sign.is-below-110")) && config.GlobalConfig.GetBool("sign.auto-refresh-token") && len(token) == 0 {
+		if (!config.IsBelow110) && config.Sign.AutoRefreshToken && len(token) == 0 {
 			logger.Warnf("token 已过期, 总丢失 token 次数为 %v", atomic.AddUint64(&missTokenCount, 1))
 			if registerLock.TryLock() {
 				defer registerLock.Unlock()
 				if err := signRefreshToken(uin); err != nil {
-					logger.Warnf("刷新 token 出现错误: %v server: %v", err, config.GlobalConfig.GetString("sign.server"))
+					logger.Warnf("刷新 token 出现错误: %v server: %v", err, config.SignServer)
 				} else {
 					logger.Info("刷新 token 成功")
 				}
@@ -215,7 +215,7 @@ func sign(seq uint64, uin string, cmd string, qua string, buff []byte) (sign []b
 }
 
 func signServerDestroy(uin string) error {
-	signServer := config.GlobalConfig.GetString("sign.server")
+	signServer := config.SignServer
 	if !strings.HasSuffix(signServer, "/") {
 		signServer += "/"
 	}
@@ -227,7 +227,7 @@ func signServerDestroy(uin string) error {
 		return errors.Errorf("当前签名服务器版本 %v 低于 1.1.6，无法使用 destroy 接口", signVersion)
 	}
 
-	req, err := http.Get(signServer + "destroy" + fmt.Sprintf("?uin=%v&key=%v", uin, config.GlobalConfig.GetString("sign.key")))
+	req, err := http.Get(signServer + "destroy" + fmt.Sprintf("?uin=%v&key=%v", uin, config.Key))
 	if err != nil {
 		return errors.Wrapf(err, "destroy 实例出现错误, server: %v", signServer)
 	}
@@ -240,7 +240,7 @@ func signServerDestroy(uin string) error {
 }
 
 func signVersion() (version string, err error) {
-	signServer := config.GlobalConfig.GetString("sign.server")
+	signServer := config.SignServer
 	req, err := http.Get(signServer)
 	if err != nil {
 		return "", err
@@ -273,9 +273,9 @@ func signStartRefreshToken(interval int64) {
 	t := time.NewTicker(time.Duration(interval) * time.Minute)
 	defer t.Stop()
 	for range t.C {
-		err := signRefreshToken(strconv.FormatInt(config.GlobalConfig.GetInt64("bot.account"), 10))
+		err := signRefreshToken(strconv.FormatInt(config.Bot.Account, 10))
 		if err != nil {
-			logger.Warnf("刷新 token 出现错误: %v server: %v", err, config.GlobalConfig.GetString("sign.server"))
+			logger.Warnf("刷新 token 出现错误: %v server: %v", err, config.SignServer)
 		}
 	}
 }
@@ -289,7 +289,7 @@ func signWaitServer() bool {
 			return false
 		}
 		i++
-		u, err := url.Parse(config.GlobalConfig.GetString("sign.server"))
+		u, err := url.Parse(config.SignServer)
 		if err != nil {
 			logger.Warnf("连接到签名服务器出现错误: %v", err)
 			continue
@@ -301,6 +301,6 @@ func signWaitServer() bool {
 		}
 		break
 	}
-	logger.Infof("连接至签名服务器: %s", config.GlobalConfig.GetString("sign.server"))
+	logger.Infof("连接至签名服务器: %s", config.SignServer)
 	return true
 }
