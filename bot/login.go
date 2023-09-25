@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"github.com/Mrs4s/MiraiGo/client"
 	"github.com/Mrs4s/MiraiGo/utils"
-	"github.com/guonaihong/gout"
+	"github.com/Sora233/MiraiGo-Template/internal/requests"
 	"github.com/mattn/go-colorable"
 	"github.com/pkg/errors"
-	"github.com/tidwall/gjson"
 	"image"
 	"image/png"
 	"log"
@@ -21,15 +20,13 @@ import (
 var console = bufio.NewReader(os.Stdin)
 
 func fetchCaptcha(id string) string {
-	var b []byte
-	err := gout.GET("https://captcha.go-cqhttp.org/captcha/ticket?id=" + id).BindBody(&b).Do()
-	//g, err := download.Request{URL: "https://captcha.go-cqhttp.org/captcha/ticket?id=" + id}.JSON()
+	g, err := requests.Request{URL: "https://captcha.go-cqhttp.org/captcha/ticket?id=" + id}.JSON()
 	if err != nil {
 		logger.Debugf("获取 Ticket 时出现错误: %v", err)
 		return ""
 	}
-	if gt := gjson.GetBytes(b, "ticket"); gt.Exists() {
-		return gt.String()
+	if g.Get("ticket").Exists() {
+		return g.Get("ticket").String()
 	}
 	return ""
 }

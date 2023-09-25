@@ -4,8 +4,7 @@ go 1.20
 
 require (
 	github.com/Mrs4s/MiraiGo v0.0.0-20230823050531-a8213e127b2b
-	github.com/fumiama/go-base16384 v1.7.0
-	github.com/guonaihong/gout v0.3.8
+	github.com/RomiChan/syncx v0.0.0-20221202055724-5f842c53020e
 	github.com/lestrrat-go/file-rotatelogs v2.4.0+incompatible
 	github.com/mattn/go-colorable v0.1.13
 	github.com/pkg/errors v0.9.1
@@ -18,7 +17,6 @@ require (
 
 require (
 	github.com/RomiChan/protobuf v0.1.1-0.20230204044148-2ed269a2e54d // indirect
-	github.com/RomiChan/syncx v0.0.0-20221202055724-5f842c53020e // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/bytedance/sonic v1.10.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect

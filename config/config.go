@@ -13,13 +13,21 @@ type BotConfig struct {
 
 // Sign 签名配置
 type SignConfig struct {
-	SignServer       string `mapstructure:"server"`
-	SignServerBearer string `mapstructure:"server-bearer"`
-	Key              string `mapstructure:"key"`
-	IsBelow110       bool   `mapstructure:"is-below-110"`
-	AutoRegister     bool   `mapstructure:"auto-register"`
-	AutoRefreshToken bool   `mapstructure:"auto-refresh-token"`
-	RefreshInterval  int64  `mapstructure:"refresh-interval"`
+	SignServers          []SignServer `mapstructure:"servers"`
+	RuleChangeSignServer int          `mapstructure:"rule-change-sign-server"`
+	MaxCheckCount        uint         `mapstructure:"max-check-count"`
+	ServerTimeout        uint         `mapstructure:"server-timeout"`
+	IsBelow110           bool         `mapstructure:"is-below-110"`
+	AutoRegister         bool         `mapstructure:"auto-register"`
+	AutoRefreshToken     bool         `mapstructure:"auto-refresh-token"`
+	RefreshInterval      int64        `mapstructure:"refresh-interval"`
+}
+
+// SignServer 签名服务器
+type SignServer struct {
+	URL           string `mapstructure:"url"`
+	Key           string `mapstructure:"key"`
+	Authorization string `mapstructure:"authorization"`
 }
 
 // Config 总配置文件
@@ -39,14 +47,11 @@ var GlobalConfig = &ViperConfig{
 
 // config
 var (
-	Bot               *BotConfig  // Bot配置
-	Sign              *SignConfig // 签名配置
-	SignServer        string      // 使用特定的服务器进行签名
-	SignServerBearer  string      // 认证签名服务器的 Bearer Token
-	Key               string      // 签名服务器密钥
-	IsBelow110        bool        // 签名服务器版本是否低于1.1.0及以下
-	HTTPTimeout       int         // download 超时时间
-	SignServerTimeout int         // 签名服务器超时时间
+	Bot               *BotConfig   // Bot配置
+	Sign              *SignConfig  // 签名配置
+	SignServers       []SignServer // 使用特定的服务器进行签名
+	IsBelow110        bool         // 签名服务器版本是否低于1.1.0及以下
+	SignServerTimeout int          // 签名服务器超时时间
 )
 
 func Base() {
@@ -58,10 +63,9 @@ func Base() {
 	{
 		Bot = config.Bot
 		Sign = config.Sign
-		SignServer = config.Sign.SignServer
-		SignServerBearer = config.Sign.SignServerBearer
-		Key = config.Sign.Key
+		SignServers = config.Sign.SignServers
 		IsBelow110 = config.Sign.IsBelow110
+		SignServerTimeout = int(config.Sign.ServerTimeout)
 	}
 }
 

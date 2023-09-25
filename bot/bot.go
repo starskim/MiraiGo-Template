@@ -96,31 +96,27 @@ func Init() {
 
 	initBot(config.Bot.Account, config.Bot.Password)
 
-	if config.SignServer == "" {
-		fmt.Println("警告: 未配置签名服务器, 这可能会导致登录 45 错误码或发送消息被风控")
-	} else {
-		logger.Infof("使用服务器 %s 进行数据包签名", config.SignServer)
-		if config.SignServerBearer != "" {
-			logger.Infof("使用 Bearer %s 认证签名服务器 %s ", config.SignServerBearer, config.SignServer)
-		}
-		// 等待签名服务器直到连接成功
-		if !signWaitServer() {
-			logger.Fatalf("连接签名服务器失败")
-		}
-		signRegister(config.Bot.Account, deviceInfo.AndroidId, deviceInfo.Guid, deviceInfo.QImei36, config.Key)
+	signServer, err := getAvaliableSignServer() // 获取可用签名服务器
+	if err != nil {
+		logger.Warn(err)
+	}
+	if signServer != nil && len(signServer.URL) > 1 {
+		logger.Infof("使用签名服务器：%v", signServer.URL)
 		go signStartRefreshToken(config.Sign.RefreshInterval) // 定时刷新 token
 		wrapper.DandelionEnergy = energy
 		wrapper.FekitGetSign = sign
 		if !config.IsBelow110 {
 			if !config.Sign.AutoRegister {
-				logger.Warn("自动注册实例已关闭，若未配置 sign-server 端自动注册实例则实例丢失时需要重启 DDBOT 以正常签名")
+				logger.Warn("自动注册实例已关闭，请配置 sign-server 端自动注册实例以保持正常签名")
 			}
 			if !config.Sign.AutoRefreshToken {
-				logger.Warn("自动刷新 token 已关闭，token 过期后获取签名时将不会立即尝试刷新获取新 token")
+				logger.Info("自动刷新 token 已关闭，token 过期后获取签名时将不会立即尝试刷新获取新 token")
 			}
 		} else {
 			logger.Warn("签名服务器版本 <= 1.1.0 ，无法使用刷新 token 等操作，建议使用 1.1.6 版本及以上签名服务器")
 		}
+	} else {
+		logger.Warnf("警告: 未配置签名服务器或签名服务器不可用, 这可能会导致登录 45 错误码或发送消息被风控")
 	}
 }
 
