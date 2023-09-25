@@ -2,18 +2,11 @@
 package requests
 
 import (
-	"bufio"
 	"compress/gzip"
 	"crypto/tls"
-	"fmt"
-	"github.com/starskim/MiraiGo-Template/config"
 	"io"
 	"net/http"
-	"net/url"
-	"os"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/RomiChan/syncx"
@@ -26,12 +19,6 @@ var clients syncx.Map[time.Duration, *http.Client]
 
 var clienth2 = &http.Client{
 	Transport: &http.Transport{
-		Proxy: func(request *http.Request) (*url.URL, error) {
-			if config.Proxy == "" {
-				return http.ProxyFromEnvironment(request)
-			}
-			return url.Parse(config.Proxy)
-		},
 		ForceAttemptHTTP2:   true,
 		MaxIdleConnsPerHost: 999,
 	},
@@ -41,12 +28,6 @@ var clienth2 = &http.Client{
 func newClient(t time.Duration) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
-			Proxy: func(request *http.Request) (*url.URL, error) {
-				if config.Proxy == "" {
-					return http.ProxyFromEnvironment(request)
-				}
-				return url.Parse(config.Proxy)
-			},
 			// Disable http2
 			TLSNextProto:        map[string]func(authority string, c *tls.Conn) http.RoundTripper{},
 			MaxIdleConnsPerHost: 999,
@@ -71,15 +52,6 @@ func (r Request) WithTimeout(t time.Duration) *Request {
 		r.custcli = c
 	}
 	return &r
-}
-
-// SetTimeout set internal/requests client timeout
-func SetTimeout(t time.Duration) {
-	if t == 0 {
-		t = time.Second * 10
-	}
-	client.Timeout = t
-	clienth2.Timeout = t
 }
 
 // Request is a file requests request
@@ -164,174 +136,6 @@ func (r Request) JSON() (gjson.Result, error) {
 	}
 
 	return gjson.Parse(sb.String()), nil
-}
-
-func writeToFile(reader io.ReadCloser, path string) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0o644)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-	_, err = file.ReadFrom(reader)
-	return err
-}
-
-// WriteToFile 下载到制定目录
-func (r Request) WriteToFile(path string) error {
-	rd, err := r.body()
-	if err != nil {
-		return err
-	}
-	defer rd.Close()
-	defer r.client().CloseIdleConnections()
-	return writeToFile(rd, path)
-}
-
-// WriteToFileMultiThreading 多线程下载到制定目录
-func (r Request) WriteToFileMultiThreading(path string, thread int) error {
-	if thread < 2 {
-		return r.WriteToFile(path)
-	}
-
-	defer r.client().CloseIdleConnections()
-	limit := r.Limit
-	type BlockMetaData struct {
-		BeginOffset    int64
-		EndOffset      int64
-		DownloadedSize int64
-	}
-	var blocks []*BlockMetaData
-	var contentLength int64
-	errUnsupportedMultiThreading := errors.New("unsupported multi-threading")
-	// 初始化分块或直接下载
-	initOrDownload := func() error {
-		header := make(map[string]string, len(r.Header))
-		for k, v := range r.Header { // copy headers
-			header[k] = v
-		}
-		header["range"] = "bytes=0-"
-		req := Request{
-			URL:    r.URL,
-			Header: header,
-		}
-		resp, err := req.do()
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return errors.New("response status unsuccessful: " + strconv.FormatInt(int64(resp.StatusCode), 10))
-		}
-		if resp.StatusCode == http.StatusOK {
-			if limit > 0 && resp.ContentLength > limit {
-				return ErrOverSize
-			}
-			if err = writeToFile(resp.Body, path); err != nil {
-				return err
-			}
-			return errUnsupportedMultiThreading
-		}
-		if resp.StatusCode == http.StatusPartialContent {
-			contentLength = resp.ContentLength
-			if limit > 0 && resp.ContentLength > limit {
-				return ErrOverSize
-			}
-			blockSize := contentLength
-			if contentLength > 1024*1024 {
-				blockSize = (contentLength / int64(thread)) - 10
-			}
-			if blockSize == contentLength {
-				return writeToFile(resp.Body, path)
-			}
-			var tmp int64
-			for tmp+blockSize < contentLength {
-				blocks = append(blocks, &BlockMetaData{
-					BeginOffset: tmp,
-					EndOffset:   tmp + blockSize - 1,
-				})
-				tmp += blockSize
-			}
-			blocks = append(blocks, &BlockMetaData{
-				BeginOffset: tmp,
-				EndOffset:   contentLength - 1,
-			})
-			return nil
-		}
-		return errors.New("unknown status code")
-	}
-	// 下载分块
-	downloadBlock := func(block *BlockMetaData) error {
-		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0o666)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		_, _ = file.Seek(block.BeginOffset, io.SeekStart)
-		writer := bufio.NewWriter(file)
-		defer writer.Flush()
-
-		header := make(map[string]string, len(r.Header))
-		for k, v := range r.Header { // copy headers
-			header[k] = v
-		}
-		header["range"] = fmt.Sprintf("bytes=%d-%d", block.BeginOffset, block.EndOffset)
-		req := Request{
-			URL:    r.URL,
-			Header: header,
-		}
-		resp, err := req.do()
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return errors.New("response status unsuccessful: " + strconv.FormatInt(int64(resp.StatusCode), 10))
-		}
-		buffer := make([]byte, 1024)
-		i, err := resp.Body.Read(buffer)
-		for {
-			if err != nil && err != io.EOF {
-				return err
-			}
-			i64 := int64(len(buffer[:i]))
-			needSize := block.EndOffset + 1 - block.BeginOffset
-			if i64 > needSize {
-				i64 = needSize
-				err = io.EOF
-			}
-			_, e := writer.Write(buffer[:i64])
-			if e != nil {
-				return e
-			}
-			block.BeginOffset += i64
-			block.DownloadedSize += i64
-			if err == io.EOF || block.BeginOffset > block.EndOffset {
-				break
-			}
-			i, err = resp.Body.Read(buffer)
-		}
-		return nil
-	}
-
-	if err := initOrDownload(); err != nil {
-		if err == errUnsupportedMultiThreading {
-			return nil
-		}
-		return err
-	}
-	wg := sync.WaitGroup{}
-	wg.Add(len(blocks))
-	var lastErr error
-	for i := range blocks {
-		go func(b *BlockMetaData) {
-			defer wg.Done()
-			if err := downloadBlock(b); err != nil {
-				lastErr = err
-			}
-		}(blocks[i])
-	}
-	wg.Wait()
-	return lastErr
 }
 
 type gzipCloser struct {

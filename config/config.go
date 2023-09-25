@@ -53,7 +53,6 @@ var (
 	SignServers       []SignServer // 使用特定的服务器进行签名
 	IsBelow110        bool         // 签名服务器版本是否低于1.1.0及以下
 	SignServerTimeout int          // 签名服务器超时时间
-	Proxy             string       // 存储 proxy,用于设置代理
 )
 
 func Base() {
@@ -68,7 +67,6 @@ func Base() {
 		SignServers = config.Sign.SignServers
 		IsBelow110 = config.Sign.IsBelow110
 		SignServerTimeout = int(config.Sign.ServerTimeout)
-		Proxy = config.Proxy
 	}
 }
 
