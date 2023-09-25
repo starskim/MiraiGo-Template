@@ -5,7 +5,7 @@ import (
 	"github.com/Mrs4s/MiraiGo/binary"
 	"github.com/Mrs4s/MiraiGo/wrapper"
 	"github.com/starskim/MiraiGo-Template/config"
-	"github.com/starskim/MiraiGo-Template/internal/download"
+	"github.com/starskim/MiraiGo-Template/internal/requests"
 	"github.com/tidwall/gjson"
 	"log"
 	"os"
@@ -165,9 +165,9 @@ func getRemoteLatestProtocolVersion(protocolType int) ([]byte, error) {
 	if !ok {
 		return nil, fmt.Errorf("remote version unavailable")
 	}
-	response, err := download.Request{URL: url}.Bytes()
+	response, err := requests.Request{URL: url}.Bytes()
 	if err != nil {
-		return download.Request{URL: "https://ghproxy.com/" + url}.Bytes()
+		return requests.Request{URL: "https://ghproxy.com/" + url}.Bytes()
 	}
 	return response, nil
 }

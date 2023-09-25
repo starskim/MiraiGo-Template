@@ -8,7 +8,7 @@ import (
 	"github.com/Mrs4s/MiraiGo/utils"
 	"github.com/mattn/go-colorable"
 	"github.com/pkg/errors"
-	"github.com/starskim/MiraiGo-Template/internal/download"
+	"github.com/starskim/MiraiGo-Template/internal/requests"
 	"image"
 	"image/png"
 	"log"
@@ -20,7 +20,7 @@ import (
 var console = bufio.NewReader(os.Stdin)
 
 func fetchCaptcha(id string) string {
-	g, err := download.Request{URL: "https://captcha.go-cqhttp.org/captcha/ticket?id=" + id}.JSON()
+	g, err := requests.Request{URL: "https://captcha.go-cqhttp.org/captcha/ticket?id=" + id}.JSON()
 	if err != nil {
 		logger.Debugf("获取 Ticket 时出现错误: %v", err)
 		return ""

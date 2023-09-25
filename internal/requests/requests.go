@@ -1,5 +1,5 @@
-// Package download provide download utility functions
-package download
+// Package requests provide requests utility functions
+package requests
 
 import (
 	"bufio"
@@ -61,7 +61,7 @@ var ErrOverSize = errors.New("oversize")
 // UserAgent HTTP请求时使用的UA
 const UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36 Edg/87.0.664.66"
 
-// WithTimeout get a download instance with timeout t
+// WithTimeout get a requests instance with timeout t
 func (r Request) WithTimeout(t time.Duration) *Request {
 	if c, ok := clients.Load(t); ok {
 		r.custcli = c
@@ -73,7 +73,7 @@ func (r Request) WithTimeout(t time.Duration) *Request {
 	return &r
 }
 
-// SetTimeout set internal/download client timeout
+// SetTimeout set internal/requests client timeout
 func SetTimeout(t time.Duration) {
 	if t == 0 {
 		t = time.Second * 10
@@ -82,7 +82,7 @@ func SetTimeout(t time.Duration) {
 	clienth2.Timeout = t
 }
 
-// Request is a file download request
+// Request is a file requests request
 type Request struct {
 	Method  string
 	URL     string

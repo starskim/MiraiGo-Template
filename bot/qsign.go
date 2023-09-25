@@ -18,7 +18,7 @@ import (
 	"github.com/Mrs4s/MiraiGo/utils"
 
 	"github.com/starskim/MiraiGo-Template/config"
-	"github.com/starskim/MiraiGo-Template/internal/download"
+	"github.com/starskim/MiraiGo-Template/internal/requests"
 )
 
 type currentSignServer atomic.Pointer[config.SignServer]
@@ -81,7 +81,7 @@ func getAvaliableSignServer() (*config.SignServer, error) {
 }
 
 func isServerAvaliable(signServer string) bool {
-	resp, err := download.Request{
+	resp, err := requests.Request{
 		Method: http.MethodGet,
 		URL:    signServer,
 	}.WithTimeout(3 * time.Second).Bytes()
@@ -143,7 +143,7 @@ func requestSignServer(method string, url string, headers map[string]string, bod
 	if auth != "-" && auth != "" {
 		headers["Authorization"] = auth
 	}
-	req := download.Request{
+	req := requests.Request{
 		Method: method,
 		Header: headers,
 		URL:    url,
