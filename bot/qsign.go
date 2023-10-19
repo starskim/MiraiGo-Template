@@ -183,13 +183,15 @@ func energy(uin uint64, id string, _ string, salt []byte) ([]byte, error) {
 // 提交回调 buffer
 func signSubmit(uin string, cmd string, callbackID int64, buffer []byte, t string) {
 	buffStr := hex.EncodeToString(buffer)
-	tail := 64
-	endl := "..."
-	if len(buffStr) < tail {
-		tail = len(buffStr)
-		endl = "."
+	if config.Debug {
+		tail := 64
+		endl := "..."
+		if len(buffStr) < tail {
+			tail = len(buffStr)
+			endl = "."
+		}
+		logger.Debugf("submit (%v): uin=%v, cmd=%v, callbackID=%v, buffer=%v%s", t, uin, cmd, callbackID, buffStr[:tail], endl)
 	}
-	logger.Infof("submit (%v): uin=%v, cmd=%v, callbackID=%v, buffer=%v%s", t, uin, cmd, callbackID, buffStr[:tail], endl)
 
 	signServer, _, err := requestSignServer(
 		http.MethodGet,
@@ -205,6 +207,12 @@ func signSubmit(uin string, cmd string, callbackID int64, buffer []byte, t strin
 // signCallback
 // 刷新 token 和签名的回调
 func signCallback(uin string, results []gjson.Result, t string) {
+	for { // 等待至在线
+		if Instance.Online.Load() {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
 	for _, result := range results {
 		cmd := result.Get("cmd").String()
 		callbackID := result.Get("callbackId").Int()
@@ -289,7 +297,6 @@ var lastToken = ""
 func sign(seq uint64, uin string, cmd string, qua string, buff []byte) (sign []byte, extra []byte, token []byte, err error) {
 	i := 0
 	for {
-
 		sign, extra, token, err = signRequset(seq, uin, cmd, qua, buff)
 		cs := ss.get()
 		if cs == nil {
@@ -352,7 +359,7 @@ func signServerDestroy(uin string) error {
 	if err != nil {
 		return errors.Wrapf(err, "获取签名服务版本出现错误, server: %v", signServer)
 	}
-	if "v"+signVersion > "v1.1.6" {
+	if "v"+signVersion < "v1.1.6" {
 		return errors.Errorf("当前签名服务器版本 %v 低于 1.1.6，无法使用 destroy 接口", signVersion)
 	}
 	cs := ss.get()
@@ -402,7 +409,7 @@ func signStartRefreshToken(interval int64) {
 		cs, master := ss.get(), &config.SignServers[0]
 		if (cs == nil || cs.URL != master.URL) && isServerAvaliable(master.URL) {
 			ss.set(master)
-			logger.Infof("主签名服务器可用，已切换至主签名服务器 %v", cs.URL)
+			logger.Infof("主签名服务器可用，已切换至主签名服务器 %v", master.URL)
 		}
 		cs = ss.get()
 		if cs == nil {

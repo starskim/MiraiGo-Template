@@ -48,6 +48,7 @@ var GlobalConfig = &ViperConfig{
 
 // config
 var (
+	Debug             bool         // 是否开启 debug 模式
 	Bot               *BotConfig   // Bot配置
 	Sign              *SignConfig  // 签名配置
 	SignServers       []SignServer // 使用特定的服务器进行签名
@@ -62,6 +63,9 @@ func Base() {
 		logrus.Fatal("配置文件不合法!", err)
 	}
 	{
+		if GlobalConfig.GetString("logLevel") == "debug" {
+			Debug = true
+		}
 		Bot = config.Bot
 		Sign = config.Sign
 		SignServers = config.Sign.SignServers
