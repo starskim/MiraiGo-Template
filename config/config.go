@@ -17,7 +17,6 @@ type SignConfig struct {
 	RuleChangeSignServer int          `mapstructure:"rule-change-sign-server"`
 	MaxCheckCount        uint         `mapstructure:"max-check-count"`
 	ServerTimeout        uint         `mapstructure:"server-timeout"`
-	IsBelow110           bool         `mapstructure:"is-below-110"`
 	AutoRegister         bool         `mapstructure:"auto-register"`
 	AutoRefreshToken     bool         `mapstructure:"auto-refresh-token"`
 	RefreshInterval      int64        `mapstructure:"refresh-interval"`
@@ -52,7 +51,6 @@ var (
 	Bot               *BotConfig   // Bot配置
 	Sign              *SignConfig  // 签名配置
 	SignServers       []SignServer // 使用特定的服务器进行签名
-	IsBelow110        bool         // 签名服务器版本是否低于1.1.0及以下
 	SignServerTimeout int          // 签名服务器超时时间
 )
 
@@ -69,7 +67,6 @@ func Base() {
 		Bot = config.Bot
 		Sign = config.Sign
 		SignServers = config.Sign.SignServers
-		IsBelow110 = config.Sign.IsBelow110
 		SignServerTimeout = int(config.Sign.ServerTimeout)
 	}
 }

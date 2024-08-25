@@ -159,9 +159,6 @@ func requestSignServer(method string, url string, headers map[string]string, bod
 func energy(uin uint64, id string, _ string, salt []byte) ([]byte, error) {
 	url := "custom_energy" + fmt.Sprintf("?data=%v&salt=%v&uin=%v&android_id=%v&guid=%v",
 		id, hex.EncodeToString(salt), uin, utils.B2S(deviceInfo.AndroidId), hex.EncodeToString(deviceInfo.Guid))
-	if config.IsBelow110 {
-		url = "custom_energy" + fmt.Sprintf("?data=%v&salt=%v", id, hex.EncodeToString(salt))
-	}
 	signServer, response, err := requestSignServer(http.MethodGet, url, nil, nil)
 	if err != nil {
 		logger.Warnf("获取T544 sign时出现错误: %v. server: %v", err, signServer)
@@ -241,19 +238,13 @@ func signRequset(seq uint64, uin string, cmd string, qua string, buff []byte) (s
 	sign, _ = hex.DecodeString(gjson.GetBytes(response, "data.sign").String())
 	extra, _ = hex.DecodeString(gjson.GetBytes(response, "data.extra").String())
 	token, _ = hex.DecodeString(gjson.GetBytes(response, "data.token").String())
-	if !config.IsBelow110 {
-		go signCallback(uin, gjson.GetBytes(response, "data.requestCallback").Array(), "sign")
-	}
+	go signCallback(uin, gjson.GetBytes(response, "data.requestCallback").Array(), "sign")
 	return sign, extra, token, nil
 }
 
 var registerLock sync.Mutex
 
 func signRegister(uin int64, androidID, guid []byte, qimei36, key string) {
-	if config.IsBelow110 {
-		logger.Warn("签名服务器版本低于1.1.0, 跳过实例注册")
-		return
-	}
 	signServer, resp, err := requestSignServer(
 		http.MethodGet,
 		"register"+fmt.Sprintf("?uin=%v&android_id=%v&guid=%v&qimei36=%v&key=%s",
@@ -313,7 +304,7 @@ func sign(seq uint64, uin string, cmd string, qua string, buff []byte) (sign []b
 			break
 		}
 		i++
-		if (!config.IsBelow110) && config.Sign.AutoRegister && err == nil && len(sign) == 0 {
+		if config.Sign.AutoRegister && err == nil && len(sign) == 0 {
 			if registerLock.TryLock() { // 避免并发时多处同时销毁并重新注册
 				logger.Debugf("请求签名：cmd=%v, qua=%v, buff=%v", seq, cmd, hex.EncodeToString(buff))
 				logger.Debugf("返回结果：sign=%v, extra=%v, token=%v",
@@ -329,7 +320,7 @@ func sign(seq uint64, uin string, cmd string, qua string, buff []byte) (sign []b
 			}
 			continue
 		}
-		if (!config.IsBelow110) && config.Sign.AutoRefreshToken && len(token) == 0 {
+		if config.Sign.AutoRefreshToken && len(token) == 0 {
 			logger.Warnf("token 已过期, 总丢失 token 次数为 %v", atomic.AddUint64(&missTokenCount, 1))
 			if registerLock.TryLock() {
 				defer registerLock.Unlock()
@@ -419,6 +410,8 @@ func signStartRefreshToken(interval int64) {
 		err := signRefreshToken(qqstr)
 		if err != nil {
 			logger.Warnf("刷新 token 出现错误: %v. server: %v", err, cs.URL)
+		} else {
+			logger.Info("刷新 token 成功")
 		}
 	}
 }
