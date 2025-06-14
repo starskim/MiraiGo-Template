@@ -3,8 +3,9 @@ package logging
 import (
 	"sync"
 
-	"github.com/Mrs4s/MiraiGo/client"
-	"github.com/Mrs4s/MiraiGo/message"
+	"github.com/LagrangeDev/LagrangeGo/client"
+	"github.com/LagrangeDev/LagrangeGo/client/event"
+	"github.com/LagrangeDev/LagrangeGo/message"
 
 	"github.com/Sora233/MiraiGo-Template/bot"
 	"github.com/Sora233/MiraiGo-Template/utils"
@@ -68,52 +69,56 @@ var logger = utils.GetModuleLogger("internal.logging")
 func logGroupMessage(msg *message.GroupMessage) {
 	logger.
 		WithField("from", "GroupMessage").
-		WithField("MessageID", msg.Id).
-		WithField("MessageIID", msg.InternalId).
-		WithField("GroupCode", msg.GroupCode).
-		WithField("SenderID", msg.Sender.Uin).
+		WithField("MessageID", msg.ID).
+		WithField("MessageIID", msg.InternalID).
+		WithField("GroupCode", msg.GroupUin).
+		WithField("SenderUin", msg.Sender.Uin).
+		WithField("SenderUID", msg.Sender.UID).
 		Info(msg.ToString())
 }
 
 func logPrivateMessage(msg *message.PrivateMessage) {
 	logger.
 		WithField("from", "PrivateMessage").
-		WithField("MessageID", msg.Id).
-		WithField("MessageIID", msg.InternalId).
-		WithField("SenderID", msg.Sender.Uin).
+		WithField("MessageID", msg.ID).
+		WithField("MessageIID", msg.InternalID).
+		WithField("SenderUin", msg.Sender.Uin).
+		WithField("SenderUID", msg.Sender.UID).
 		WithField("Target", msg.Target).
 		Info(msg.ToString())
 }
 
-func logFriendMessageRecallEvent(event *client.FriendMessageRecalledEvent) {
+func logFriendMessageRecallEvent(event *event.FriendRecall) {
 	logger.
 		WithField("from", "FriendsMessageRecall").
-		WithField("MessageID", event.MessageId).
-		WithField("SenderID", event.FriendUin).
+		WithField("FromUin", event.FromUin).
+		WithField("Sequence", event.Sequence).
+		WithField("FromUID", event.FromUID).
 		Info("friend message recall")
 }
 
-func logGroupMessageRecallEvent(event *client.GroupMessageRecalledEvent) {
+func logGroupMessageRecallEvent(event *event.GroupRecall) {
 	logger.
 		WithField("from", "GroupMessageRecall").
-		WithField("MessageID", event.MessageId).
-		WithField("GroupCode", event.GroupCode).
-		WithField("SenderID", event.AuthorUin).
-		WithField("OperatorID", event.OperatorUin).
+		WithField("OperatorUID", event.OperatorUID).
+		WithField("OperatorUin", event.OperatorUin).
+		WithField("GroupCode", event.GroupUin).
 		Info("group message recall")
 }
 
-func logGroupMuteEvent(event *client.GroupMuteEvent) {
+func logGroupMuteEvent(event *event.GroupMute) {
 	logger.
 		WithField("from", "GroupMute").
-		WithField("GroupCode", event.GroupCode).
-		WithField("OperatorID", event.OperatorUin).
-		WithField("TargetID", event.TargetUin).
-		WithField("MuteTime", event.Time).
+		WithField("GroupCode", event.GroupUin).
+		WithField("GroupUserUin", event.GroupEvent.UserUin).
+		WithField("GroupUserUID", event.GroupEvent.UserUID).
+		WithField("OperatorUID", event.OperatorUID).
+		WithField("OperatorUin", event.OperatorUin).
+		WithField("MuteTime", event.Duration).
 		Info("group mute")
 }
 
-func logDisconnect(event *client.ClientDisconnectedEvent) {
+func logDisconnect(event *client.DisconnectedEvent) {
 	logger.
 		WithField("from", "Disconnected").
 		WithField("reason", event.Message).
@@ -121,7 +126,7 @@ func logDisconnect(event *client.ClientDisconnectedEvent) {
 }
 
 func registerLog(b *bot.Bot) {
-	b.GroupMessageRecalledEvent.Subscribe(func(qqClient *client.QQClient, event *client.GroupMessageRecalledEvent) {
+	b.GroupRecallEvent.Subscribe(func(qqClient *client.QQClient, event *event.GroupRecall) {
 		logGroupMessageRecallEvent(event)
 	})
 
@@ -129,7 +134,7 @@ func registerLog(b *bot.Bot) {
 		logGroupMessage(groupMessage)
 	})
 
-	b.GroupMuteEvent.Subscribe(func(qqClient *client.QQClient, event *client.GroupMuteEvent) {
+	b.GroupMuteEvent.Subscribe(func(qqClient *client.QQClient, event *event.GroupMute) {
 		logGroupMuteEvent(event)
 	})
 
@@ -137,11 +142,11 @@ func registerLog(b *bot.Bot) {
 		logPrivateMessage(privateMessage)
 	})
 
-	b.FriendMessageRecalledEvent.Subscribe(func(qqClient *client.QQClient, event *client.FriendMessageRecalledEvent) {
+	b.FriendRecallEvent.Subscribe(func(qqClient *client.QQClient, event *event.FriendRecall) {
 		logFriendMessageRecallEvent(event)
 	})
 
-	b.DisconnectedEvent.Subscribe(func(qqClient *client.QQClient, event *client.ClientDisconnectedEvent) {
+	b.DisconnectedEvent.Subscribe(func(qqClient *client.QQClient, event *client.DisconnectedEvent) {
 		logDisconnect(event)
 	})
 }

@@ -18,7 +18,7 @@ func init() {
 
 func main() {
 	// 快速初始化
-	bot.Init()
+	bot.Init(&utils.ProtocolLogger{})
 
 	// 初始化 Modules
 	bot.StartService()
@@ -26,8 +26,8 @@ func main() {
 	// 登录
 	bot.Login()
 
-	// 刷新好友列表，群列表
-	bot.RefreshList()
+	defer bot.Dumpsig()
+	defer bot.QQClient.Release()
 
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt, os.Kill)
